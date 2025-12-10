@@ -108,7 +108,7 @@ onUnmounted(() => {
 .logo-text {
     font-size: 1.125rem;
     font-weight: 700;
-    background: var(--color-accent-gradient);
+    background: #ef4444;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -138,11 +138,7 @@ onUnmounted(() => {
 }
 
 .nav-item.active {
-    background: linear-gradient(
-        135deg,
-        rgba(255, 133, 162, 0.2) 0%,
-        rgba(255, 209, 102, 0.2) 100%
-    );
+    background: linear-gradient(135deg, rgba(255, 209, 102, 0.2) 100%);
     color: var(--color-accent-primary);
 }
 
