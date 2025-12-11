@@ -24,7 +24,7 @@ import {RouterLink} from "vue-router";
                 to="/project/new"
                 class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-                <span class="mr-1">➕</span>
+                <span class="mr-1"></span>
                 <span>프로젝트 등록</span>
             </RouterLink>
         </header>

@@ -116,6 +116,7 @@ const hasContexts = computed(() => contexts.value.length > 0);
                         v-if="isLoading"
                         class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
                     />
+                    <span class="mr-1"></span>
                     <span class="ml-1">
                         {{ isLoading ? "생성 중..." : "테스트케이스 생성" }}
                     </span>
@@ -193,7 +194,7 @@ const hasContexts = computed(() => contexts.value.length > 0);
                         class="flex cursor-pointer items-center bg-gray-50 px-6 py-4 transition-colors hover:bg-gray-100"
                     >
                         <span class="text-lg font-medium text-gray-900">
-                            📚 사용된 컨텍스트 ({{ contexts.length }}개)
+                            사용된 컨텍스트 ({{ contexts.length }}개)
                         </span>
                         <svg
                             class="ml-2 h-5 w-5 text-gray-500"
