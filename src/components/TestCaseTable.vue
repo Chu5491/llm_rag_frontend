@@ -1,26 +1,25 @@
-<script setup>
+<script setup lang="ts">
 import {ref, computed} from "vue";
+import type {TestCase} from "../types/testcase.js";
 
-const props = defineProps({
-    testCases: {
-        type: Array,
-        default: () => [],
-    },
-});
+const props = defineProps<{testCases?: TestCase[]}>();
 
 // 정렬 상태
-const sortKey = ref("testcase_id");
-const sortOrder = ref("asc");
+const sortKey = ref<keyof TestCase | "testcase_id">("testcase_id");
+const sortOrder = ref<"asc" | "desc">("asc");
 
 // 펼쳐진 행
-const expandedRows = ref(new Set());
+const expandedRows = ref(new Set<string | number>());
+
+// 테스트케이스 존재 여부
+const hasTestCases = computed(() => (props.testCases?.length ?? 0) > 0);
 
 // 정렬된 테스트케이스
 const sortedTestCases = computed(() => {
-    const cases = [...props.testCases];
+    const cases = [...(props.testCases || [])] as TestCase[];
     cases.sort((a, b) => {
-        const aVal = a[sortKey.value] || "";
-        const bVal = b[sortKey.value] || "";
+        const aVal = a[sortKey.value] ?? "";
+        const bVal = b[sortKey.value] ?? "";
         const cmp = String(aVal).localeCompare(String(bVal));
         return sortOrder.value === "asc" ? cmp : -cmp;
     });
@@ -28,7 +27,7 @@ const sortedTestCases = computed(() => {
 });
 
 // 정렬 토글
-const toggleSort = (key) => {
+const toggleSort = (key: keyof TestCase | "testcase_id") => {
     if (sortKey.value === key) {
         sortOrder.value = sortOrder.value === "asc" ? "desc" : "asc";
     } else {
@@ -38,13 +37,14 @@ const toggleSort = (key) => {
 };
 
 // 행 펼치기/접기
-const toggleRow = (id) => {
+const toggleRow = (id: string | number) => {
     if (expandedRows.value.has(id)) {
         expandedRows.value.delete(id);
     } else {
         expandedRows.value.add(id);
     }
-    expandedRows.value = new Set(expandedRows.value); // 반응성 트리거
+    // Set 자체를 새로 할당해서 반응성 트리거
+    expandedRows.value = new Set(expandedRows.value);
 };
 
 // JSON 복사
@@ -58,117 +58,151 @@ const copyAsJson = async () => {
         alert("복사 실패");
     }
 };
-
-// Priority 뱃지 클래스
-const getPriorityClass = (priority) => {
-    const p = (priority || "").toLowerCase();
-    if (p === "high") return "badge-high";
-    if (p === "medium") return "badge-medium";
-    return "badge-low";
-};
 </script>
 
 <template>
-    <div class="testcase-table-wrapper">
-        <div class="table-header">
-            <h2 class="table-title">테스트케이스 목록</h2>
-            <div class="table-actions">
-                <button class="btn btn-secondary" @click="copyAsJson">
-                    📋 JSON 복사
-                </button>
-            </div>
-        </div>
+    <section class="rounded-lg bg-white p-4 shadow space-y-4">
+        <!-- 헤더 / 액션 -->
+        <header class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-semibold text-gray-900">
+                테스트케이스 목록
+            </h2>
+            <button
+                type="button"
+                class="inline-flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                @click="copyAsJson"
+                :disabled="!hasTestCases"
+            >
+                📋
+                <span class="ml-1">JSON 복사</span>
+            </button>
+        </header>
 
-        <div class="table-container">
-            <table>
-                <thead>
+        <!-- 데이터 없을 때 -->
+        <p v-if="!hasTestCases" class="text-sm text-gray-500">
+            아직 생성된 테스트케이스가 없습니다.
+        </p>
+
+        <!-- 테이블 -->
+        <div
+            v-else
+            class="overflow-x-auto rounded-lg border border-gray-100 bg-white"
+        >
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-xs font-medium text-gray-500">
                     <tr>
-                        <th class="col-expand"></th>
-                        <th class="col-id" @click="toggleSort('testcase_id')">
+                        <th class="w-10 px-3 py-2 text-left"></th>
+                        <th
+                            class="w-32 px-3 py-2 text-left cursor-pointer select-none"
+                            @click="toggleSort('testcase_id')"
+                        >
                             ID
                             <span
                                 v-if="sortKey === 'testcase_id'"
-                                class="sort-icon"
+                                class="ml-1 text-[10px] text-gray-500"
                             >
                                 {{ sortOrder === "asc" ? "↑" : "↓" }}
                             </span>
                         </th>
-                        <th class="col-title" @click="toggleSort('title')">
+                        <th
+                            class="px-3 py-2 text-left cursor-pointer select-none"
+                            @click="toggleSort('title')"
+                        >
                             제목
-                            <span v-if="sortKey === 'title'" class="sort-icon">
+                            <span
+                                v-if="sortKey === 'title'"
+                                class="ml-1 text-[10px] text-gray-500"
+                            >
                                 {{ sortOrder === "asc" ? "↑" : "↓" }}
                             </span>
                         </th>
                         <th
-                            class="col-priority"
+                            class="w-32 px-3 py-2 text-left cursor-pointer select-none"
                             @click="toggleSort('priority')"
                         >
                             우선순위
                             <span
                                 v-if="sortKey === 'priority'"
-                                class="sort-icon"
+                                class="ml-1 text-[10px] text-gray-500"
                             >
                                 {{ sortOrder === "asc" ? "↑" : "↓" }}
                             </span>
                         </th>
-                        <th class="col-result">예상 결과</th>
+                        <th class="px-3 py-2 text-left">예상 결과</th>
                     </tr>
                 </thead>
-                <tbody>
+
+                <tbody class="divide-y divide-gray-100">
                     <template
                         v-for="tc in sortedTestCases"
                         :key="tc.testcase_id"
                     >
+                        <!-- 메인 행 -->
                         <tr
+                            class="cursor-pointer hover:bg-gray-50"
                             :class="{
-                                expanded: expandedRows.has(tc.testcase_id),
+                                'bg-gray-50': expandedRows.has(tc.testcase_id),
                             }"
                             @click="toggleRow(tc.testcase_id)"
                         >
-                            <td class="col-expand">
-                                <span class="expand-icon">
-                                    {{
-                                        expandedRows.has(tc.testcase_id)
-                                            ? "▼"
-                                            : "▶"
-                                    }}
-                                </span>
+                            <td class="px-3 py-2 text-center align-top">
+                                {{
+                                    expandedRows.has(tc.testcase_id) ? "▼" : "▶"
+                                }}
                             </td>
-                            <td class="col-id">
-                                <code>{{ tc.testcase_id }}</code>
+                            <td class="px-3 py-2 align-top">
+                                <code class="text-xs font-mono text-indigo-600">
+                                    {{ tc.testcase_id }}
+                                </code>
                             </td>
-                            <td class="col-title">{{ tc.title }}</td>
-                            <td class="col-priority">
+                            <td class="px-3 py-2 align-top">
+                                {{ tc.title }}
+                            </td>
+                            <td class="px-3 py-2 align-top">
                                 <span
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                     :class="[
-                                        'badge',
-                                        getPriorityClass(tc.priority),
+                                        tc.priority === 'High'
+                                            ? 'bg-red-100 text-red-700'
+                                            : tc.priority === 'Medium'
+                                            ? 'bg-yellow-100 text-yellow-700'
+                                            : 'bg-green-100 text-green-700',
                                     ]"
                                 >
                                     {{ tc.priority }}
                                 </span>
                             </td>
-                            <td class="col-result">{{ tc.expected_result }}</td>
+                            <td class="px-3 py-2 align-top">
+                                {{ tc.expected_result }}
+                            </td>
                         </tr>
 
-                        <!-- 확장 행 -->
-                        <tr
-                            v-if="expandedRows.has(tc.testcase_id)"
-                            class="expanded-row"
-                        >
-                            <td colspan="5">
-                                <div class="expanded-content">
-                                    <div class="detail-section">
-                                        <h4 class="detail-label">사전 조건</h4>
-                                        <p class="detail-value">
+                        <!-- 펼쳐진 상세 행 -->
+                        <tr v-if="expandedRows.has(tc.testcase_id)">
+                            <td colspan="5" class="px-3 pb-4">
+                                <div
+                                    class="grid gap-4 rounded-md bg-gray-50 p-4 text-sm text-gray-700 md:grid-cols-3"
+                                >
+                                    <section class="md:col-span-1 space-y-1">
+                                        <h4
+                                            class="text-xs font-semibold text-gray-500"
+                                        >
+                                            사전 조건
+                                        </h4>
+                                        <p>
                                             {{ tc.preconditions || "-" }}
                                         </p>
-                                    </div>
-                                    <div class="detail-section">
-                                        <h4 class="detail-label">
+                                    </section>
+
+                                    <section class="md:col-span-2 space-y-1">
+                                        <h4
+                                            class="text-xs font-semibold text-gray-500"
+                                        >
                                             테스트 단계
                                         </h4>
-                                        <ol class="steps-list">
+                                        <ol
+                                            class="list-decimal list-inside space-y-1"
+                                        >
                                             <li
                                                 v-for="(step, idx) in tc.steps"
                                                 :key="idx"
@@ -181,7 +215,7 @@ const getPriorityClass = (priority) => {
                                                 }}
                                             </li>
                                         </ol>
-                                    </div>
+                                    </section>
                                 </div>
                             </td>
                         </tr>
@@ -189,156 +223,5 @@ const getPriorityClass = (priority) => {
                 </tbody>
             </table>
         </div>
-    </div>
+    </section>
 </template>
-
-<style scoped>
-.testcase-table-wrapper {
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-}
-
-.table-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-lg);
-    border-bottom: 1px solid var(--color-border);
-}
-
-.table-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-}
-
-.table-actions {
-    display: flex;
-    gap: var(--space-sm);
-}
-
-.table-container {
-    overflow-x: auto;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th {
-    position: sticky;
-    top: 0;
-    background: var(--color-bg-tertiary);
-    cursor: pointer;
-    user-select: none;
-}
-
-th:hover {
-    background: var(--color-bg-hover);
-}
-
-.col-expand {
-    width: 40px;
-    text-align: center;
-}
-
-.col-id {
-    width: 120px;
-}
-
-.col-title {
-    min-width: 200px;
-}
-
-.col-priority {
-    width: 100px;
-}
-
-.col-result {
-    min-width: 200px;
-}
-
-.sort-icon {
-    margin-left: var(--space-xs);
-    color: var(--color-accent-primary);
-}
-
-tbody tr {
-    cursor: pointer;
-    transition: background var(--transition-fast);
-}
-
-tbody tr:hover {
-    background: var(--color-bg-hover);
-}
-
-tbody tr.expanded {
-    background: rgba(99, 102, 241, 0.05);
-}
-
-.expand-icon {
-    font-size: 0.625rem;
-    color: var(--color-text-muted);
-}
-
-code {
-    font-family: "SF Mono", "Monaco", "Inconsolata", monospace;
-    font-size: 0.8125rem;
-    color: var(--color-accent-primary);
-}
-
-.expanded-row {
-    background: var(--color-bg-tertiary) !important;
-}
-
-.expanded-row:hover {
-    background: var(--color-bg-tertiary) !important;
-}
-
-.expanded-content {
-    padding: var(--space-lg);
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: var(--space-xl);
-}
-
-.detail-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-}
-
-.detail-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-muted);
-}
-
-.detail-value {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-}
-
-.steps-list {
-    margin: 0;
-    padding-left: var(--space-lg);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-}
-
-.steps-list li {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-}
-
-@media (max-width: 768px) {
-    .expanded-content {
-        grid-template-columns: 1fr;
-    }
-}
-</style>
