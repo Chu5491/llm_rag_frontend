@@ -116,7 +116,6 @@ const hasContexts = computed(() => contexts.value.length > 0);
                         v-if="isLoading"
                         class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
                     />
-                    <span v-else>🚀</span>
                     <span class="ml-1">
                         {{ isLoading ? "생성 중..." : "테스트케이스 생성" }}
                     </span>

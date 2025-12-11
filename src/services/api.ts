@@ -19,3 +19,27 @@ export async function generateTestCases(
     if (!res.ok) throw new Error("generate API failed");
     return res.json();
 }
+
+export async function checkFigmaIntegration(): Promise<any> {
+    const res = await fetch("/api/v1/figma/info");
+
+    if (!res.ok) {
+        let message = "Figma 연동 체크에 실패했습니다.";
+
+        try {
+            const data = await res.json();
+            if (data && data.detail) {
+                message =
+                    typeof data.detail === "string"
+                        ? data.detail
+                        : JSON.stringify(data.detail);
+            }
+        } catch {
+            // json 파싱 실패하면 기본 메시지 그대로 사용
+        }
+
+        throw new Error(message);
+    }
+
+    return res.json();
+}

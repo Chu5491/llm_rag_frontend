@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {ref, computed, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
+import {checkFigmaIntegration} from "../services/api.js";
 
 const router = useRouter();
 
@@ -66,72 +67,102 @@ const removeArtifactRow = (id: number) => {
     artifacts.value = artifacts.value.filter((row) => row.id !== id);
 };
 
-// 전체 선택 여부
-const allArtifactsSelected = computed(() =>
-    artifacts.value.every((row) => row.selected)
-);
+/* 외부 시스템 타입 정의 */
+type ExternalSystemId = "jira" | "figma";
+type ExternalStatus = "idle" | "connected" | "error";
 
-// 전체 선택 토글
-const toggleAllSelected = (event: Event) => {
-    const target = event.target as HTMLInputElement | null;
-    if (!target) return;
-    const checked = target.checked;
-    artifacts.value.forEach((row) => {
-        row.selected = checked;
-    });
-};
-
-// 사용 환경
-type EnvOption = {
-    id: string;
-    label: string;
-    linkLabel: string;
-    checked: boolean;
-};
-
-const environments = ref<EnvOption[]>([
-    {
-        id: "env-web",
-        label: "웹 브라우저",
-        linkLabel: "웹 브라우저 링크 첨부",
-        checked: false,
-    },
-    {
-        id: "env-ios",
-        label: "Ios 어플",
-        linkLabel: "앱 다운로드 링크 첨부",
-        checked: false,
-    },
-    {
-        id: "env-android",
-        label: "Android 어플",
-        linkLabel: "앱 다운로드 링크 첨부",
-        checked: false,
-    },
-]);
-
-// 외부 시스템
 type ExternalSystem = {
-    id: string;
+    id: ExternalSystemId;
     label: string;
-    linkLabel: string;
-    checked: boolean;
+    description: string;
+    enabled: boolean;
+    pat: string;
+    url: string;
+    status: ExternalStatus;
 };
 
 const externalSystems = ref<ExternalSystem[]>([
     {
-        id: "ext-jira",
+        id: "jira",
         label: "Jira",
-        linkLabel: "웹 브라우저 링크 첨부",
-        checked: false,
+        description: "이슈/티켓 관리용 Jira 프로젝트를 연동합니다.",
+        enabled: false,
+        pat: "",
+        url: "",
+        status: "idle",
     },
     {
-        id: "ext-figma",
+        id: "figma",
         label: "Figma",
-        linkLabel: "웹 브라우저 링크 첨부",
-        checked: false,
+        description: "디자인 산출물을 기반으로 테스트케이스를 생성합니다.",
+        enabled: false,
+        pat: "",
+        url: "",
+        status: "idle",
     },
 ]);
+
+/* 현재 팝업에 열려 있는 시스템 id */
+const activeExternalPopup = ref<ExternalSystemId | null>(null);
+
+/* 팝업에서 사용하는 시스템 객체 */
+const activeExternalSystem = computed(
+    () =>
+        externalSystems.value.find((s) => s.id === activeExternalPopup.value) ??
+        null
+);
+
+/* 팝업 내 에러 메시지 */
+const popupError = ref<string | null>(null);
+
+/* 카드 오른쪽 토글 클릭 시 */
+const toggleExternalSystem = (id: ExternalSystemId) => {
+    const system = externalSystems.value.find((s) => s.id === id);
+    if (!system) return;
+
+    // off → on 되는 순간에만 팝업 띄우기
+    if (!system.enabled) {
+        system.enabled = true;
+        activeExternalPopup.value = id;
+    } else {
+        // 다시 끌 때는 단순 off
+        system.enabled = false;
+    }
+};
+
+/* 팝업에서 취소 */
+const cancelExternalPopup = () => {
+    // 취소 시 enable을 끌지 말지 선택 가능 (여기선 끄는 쪽으로 처리)
+    if (activeExternalSystem.value) {
+        activeExternalSystem.value.enabled = false;
+    }
+    activeExternalPopup.value = null;
+};
+
+/* 팝업에서 저장 */
+const saveExternalConfig = async () => {
+    const system = activeExternalSystem.value;
+    if (!system) return;
+
+    popupError.value = null;
+
+    if (system.id === "figma") {
+        try {
+            const data = await checkFigmaIntegration(); // ← 여기!
+            console.log("Figma 연결 성공:", data);
+
+            system.status = "connected";
+            popupError.value = null;
+            activeExternalPopup.value = null; // 팝업 닫기
+        } catch (e: any) {
+            popupError.value =
+                e?.message ?? "Figma 연동 중 알 수 없는 오류가 발생했습니다.";
+            system.status = "error";
+        }
+    } else {
+        activeExternalPopup.value = null;
+    }
+};
 
 const handleCancel = () => {
     if (saveStatus.value !== "idle") return; // 저장 중/완료 표시 중에는 취소 막기
@@ -245,14 +276,6 @@ onUnmounted(() => {
                                 class="border-b border-slate-200 text-xs font-medium uppercase text-slate-500"
                             >
                                 <tr>
-                                    <th scope="col" class="w-12 px-4 py-3">
-                                        <input
-                                            type="checkbox"
-                                            class="rounded border-slate-300 text-blue-500 focus:ring-blue-500"
-                                            :checked="allArtifactsSelected"
-                                            @change="toggleAllSelected"
-                                        />
-                                    </th>
                                     <th
                                         scope="col"
                                         class="px-4 py-3 font-medium"
@@ -283,13 +306,6 @@ onUnmounted(() => {
                                     :key="row.id"
                                     class="transition-colors hover:bg-slate-50"
                                 >
-                                    <td class="px-4 py-4">
-                                        <input
-                                            v-model="row.selected"
-                                            type="checkbox"
-                                            class="rounded border-slate-300 text-blue-500 focus:ring-blue-500"
-                                        />
-                                    </td>
                                     <td
                                         class="px-4 py-4 font-medium text-slate-700"
                                     >
@@ -326,63 +342,161 @@ onUnmounted(() => {
                     </div>
                 </section>
 
-                <!-- 4. 사용 환경 -->
+                <!-- 4. 외부 시스템 -->
                 <section class="space-y-4">
                     <label class="block text-lg font-medium text-slate-800">
-                        4. 프로젝트 사용 환경은 무엇인가요?
-                    </label>
-                    <div class="space-y-3 pl-1">
-                        <div
-                            v-for="env in environments"
-                            :key="env.id"
-                            class="flex items-center gap-3"
-                        >
-                            <input
-                                v-model="env.checked"
-                                :id="env.id"
-                                type="checkbox"
-                                class="h-5 w-5 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
-                            />
-                            <label :for="env.id" class="w-24 text-slate-800">
-                                {{ env.label }}
-                            </label>
-                            <button
-                                type="button"
-                                class="text-sm font-medium text-blue-600 underline decoration-1 underline-offset-2 hover:text-blue-700"
-                            >
-                                {{ env.linkLabel }}
-                            </button>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 5. 외부 시스템 -->
-                <section class="space-y-4">
-                    <label class="block text-lg font-medium text-slate-800">
-                        5. 프로젝트에 대해 참고할 수 있는 접근 가능한 외부
+                        4. 프로젝트에 대해 참고할 수 있는 접근 가능한 외부
                         시스템이 있나요?
                     </label>
-                    <div class="space-y-3 pl-1">
-                        <div
+
+                    <!-- 카드 2개: Jira / Figma -->
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <article
                             v-for="ext in externalSystems"
                             :key="ext.id"
-                            class="flex items-center gap-3"
+                            class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm"
                         >
-                            <input
-                                v-model="ext.checked"
-                                :id="ext.id"
-                                type="checkbox"
-                                class="h-5 w-5 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
-                            />
-                            <label :for="ext.id" class="w-24 text-slate-800">
-                                {{ ext.label }}
-                            </label>
-                            <button
-                                type="button"
-                                class="text-sm font-medium text-blue-600 underline decoration-1 underline-offset-2 hover:text-blue-700"
+                            <div class="flex items-start gap-3">
+                                <!-- 아이콘 -->
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white"
+                                    :class="
+                                        ext.id === 'jira'
+                                            ? 'bg-blue-600'
+                                            : 'bg-violet-500'
+                                    "
+                                >
+                                    <span v-if="ext.id === 'jira'">Jr</span>
+                                    <span v-else>Fg</span>
+                                </div>
+
+                                <!-- 타이틀 + 설명 -->
+                                <div class="flex-1">
+                                    <h3
+                                        class="text-sm font-semibold text-slate-900"
+                                    >
+                                        {{ ext.label }}
+                                    </h3>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ ext.description }}
+                                    </p>
+                                </div>
+
+                                <!-- 토글 스위치 -->
+                                <button
+                                    type="button"
+                                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                                    :class="
+                                        ext.enabled
+                                            ? 'bg-emerald-500'
+                                            : 'bg-slate-300'
+                                    "
+                                    @click="toggleExternalSystem(ext.id)"
+                                >
+                                    <span
+                                        class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200"
+                                        :class="
+                                            ext.enabled
+                                                ? 'translate-x-5'
+                                                : 'translate-x-0'
+                                        "
+                                    />
+                                </button>
+                            </div>
+
+                            <!-- 하단 상태 텍스트 -->
+                            <p class="mt-3 text-xs text-slate-500">
+                                <span v-if="ext.enabled && ext.url">
+                                    연결됨:
+                                    <span class="font-medium text-slate-700">{{
+                                        ext.url
+                                    }}</span>
+                                </span>
+                                <span v-else-if="ext.enabled">
+                                    연결 정보가 아직 설정되지 않았습니다.
+                                </span>
+                                <span v-else>
+                                    토글을 켜서 {{ ext.label }} 연동 정보를
+                                    설정하세요.
+                                </span>
+                            </p>
+                        </article>
+                    </div>
+
+                    <!-- 🔹 외부 시스템 설정 팝업 -->
+                    <div
+                        v-if="activeExternalPopup && activeExternalSystem"
+                        class="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
+                    >
+                        <div
+                            class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+                        >
+                            <h3 class="text-base font-semibold text-slate-900">
+                                {{ activeExternalSystem.label }} 연동 정보
+                            </h3>
+                            <p class="mt-1 text-xs text-slate-500">
+                                접근 가능한 URL과 Personal Access Token(PAT)을
+                                입력해주세요.
+                            </p>
+
+                            <div class="mt-4 space-y-4">
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-slate-700"
+                                    >
+                                        URL
+                                    </label>
+                                    <input
+                                        v-model="activeExternalSystem.url"
+                                        type="text"
+                                        placeholder="https://your-domain.atlassian.net / https://www.figma.com/file/..."
+                                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-slate-700"
+                                    >
+                                        Personal Access Token (PAT)
+                                    </label>
+                                    <input
+                                        v-model="activeExternalSystem.pat"
+                                        type="password"
+                                        placeholder="토큰 값을 입력하세요"
+                                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                    <p class="mt-1 text-[11px] text-slate-400">
+                                        실제 서비스에서는 안전한 저장소에
+                                        암호화하여 보관해야 합니다.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-md border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                    @click="cancelExternalPopup"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-md bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                                    @click="saveExternalConfig"
+                                >
+                                    저장
+                                </button>
+                            </div>
+                            <div
+                                v-if="popupError"
+                                class="mt-2 rounded-md bg-red-50 px-3 py-2"
                             >
-                                {{ ext.linkLabel }}
-                            </button>
+                                <p class="text-xs text-red-600">
+                                    {{ popupError }}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </section>
