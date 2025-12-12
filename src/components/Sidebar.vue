@@ -9,6 +9,7 @@ type NavItem = {path: string; name: string; icon?: string};
 
 const navItems: NavItem[] = [
     {path: "/", name: "Dashboard", icon: ""},
+    {path: "/testcase", name: "TC 자동생성", icon: ""},
     {path: "/project", name: "프로젝트 관리", icon: ""},
 ];
 
@@ -32,7 +33,7 @@ const checkApiStatus = async () => {
 
 onMounted(() => {
     checkApiStatus();
-    // 30초마다 상태 체크
+    // TODO: 30초마다 상태 체크
     statusInterval = window.setInterval(checkApiStatus, 30_000);
 });
 
@@ -47,8 +48,14 @@ onUnmounted(() => {
     <aside class="sidebar-custom">
         <!-- 상단 로고 / 타이틀 -->
         <header class="sidebar-header">
-            <div class="flex items-center gap-3 font-semibold">
-                <span>T-Gen</span>
+            <div>
+                <RouterLink
+                    to="/"
+                    class="flex items-center gap-3 font-semibold"
+                >
+                    <span class="mr-1"></span>
+                    <span>T-Gen</span>
+                </RouterLink>
             </div>
         </header>
 

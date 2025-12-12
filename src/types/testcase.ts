@@ -4,5 +4,6 @@ export type TestCase = {
     priority?: string;
     expected_result?: string;
     preconditions?: string;
+    module?: string;
     steps?: string[];
 };
