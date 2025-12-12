@@ -43,3 +43,11 @@ export async function checkFigmaIntegration(): Promise<any> {
 
     return res.json();
 }
+
+export async function getOllamaModels() {
+    const res = await fetch("/api/v1/ollama/models");
+    if (!res.ok) {
+        throw new Error("Ollama 모델 목록 조회에 실패했습니다.");
+    }
+    return res.json(); // { models: [{ name, digest, size }, ...] }
+}

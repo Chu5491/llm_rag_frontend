@@ -4,6 +4,7 @@ import Project from "../views/Project.vue";
 import ProjectCreate from "../views/ProjectCreate.vue";
 import TestCase from "../views/TestCase.vue";
 import TestCaseCreate from "../views/TestCaseCreate.vue";
+import RagTest from "../views/RagTest.vue";
 
 const routes: Array<RouteRecordRaw> = [
     {
@@ -30,6 +31,11 @@ const routes: Array<RouteRecordRaw> = [
         path: "/testcase/new",
         name: "TestCaseCreate",
         component: TestCaseCreate,
+    },
+    {
+        path: "/test",
+        name: "test",
+        component: RagTest,
     },
 ];
 

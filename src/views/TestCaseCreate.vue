@@ -1,190 +1,395 @@
 <script setup lang="ts">
-import {ref, computed} from "vue";
-import TestCaseTable from "../components/TestCaseTable.vue";
-import type {TestCase} from "../types/testcase.js";
-import {generateTestCases} from "../services/api.js";
+import {ref, onMounted} from "vue";
+import {getOllamaModels} from "../services/api.js";
 
-// 소스 타입
-const sourceType = ref<"file" | "figma">("file");
+// 폼 상태 (지금은 목업용 기본값)
+const selectedProject = ref("SKT Agent Bench");
+const selectedArtifact = ref("화면설계서");
+const selectedFeature = ref("로그인");
 
-// 테스트케이스 결과
-const testCases = ref<TestCase[]>([]);
-const isLoading = ref<boolean>(false);
-const error = ref<string | null>(null);
-
-// 컨텍스트 정보
-const contexts = ref<any[]>([]);
-
-// 테스트케이스 생성
-const handleGenerate = async () => {
-    isLoading.value = true;
-    error.value = null;
-    testCases.value = [];
-
-    const endpoint =
-        sourceType.value === "file"
-            ? "/api/v1/rag/generate/file"
-            : "/api/v1/rag/generate/figma";
-
-    try {
-        const data = await generateTestCases(endpoint);
-        parseResponse(data);
-    } catch (e: any) {
-        error.value = e?.message ?? "Unknown error";
-    } finally {
-        isLoading.value = false;
-    }
+// Ollama LLM 모델 목록 (임베딩 제외)
+type OllamaModel = {
+    name: string;
+    digest: string;
+    size: number;
 };
 
-// 응답 파싱
-const parseResponse = (data: any) => {
-    contexts.value = data.contexts || [];
+const llmModels = ref<string[]>([]);
+const selectedModel = ref<string>("");
+const modelsLoading = ref(false);
+const modelsError = ref<string | null>(null);
+
+const selectedLanguage = ref("한글");
+
+const tcPrefix = ref("SAB");
+const tcCount = ref<number | null>(25);
+
+// Ollama 모델 목록 가져오기
+onMounted(async () => {
+    modelsLoading.value = true;
+    modelsError.value = null;
 
     try {
-        const parsed = JSON.parse(data.answer);
-        if (Array.isArray(parsed)) {
-            testCases.value = parsed;
-        } else {
-            testCases.value = [];
+        const data = await getOllamaModels();
+        const models: OllamaModel[] = data.models ?? [];
+
+        // 👉 맨 위가 임베딩 모델(bge)이니까, 일단 0번 인덱스는 빼고 사용
+        const filtered = models.slice(1).map((m) => m.name);
+
+        llmModels.value = filtered;
+
+        // 기본 선택값 세팅
+        if (filtered.length > 0) {
+            selectedModel.value = filtered[0];
         }
-    } catch {
-        testCases.value = [];
-        error.value = "JSON 파싱 실패: " + data.answer?.substring(0, 100);
+    } catch (e: any) {
+        modelsError.value =
+            e?.message ?? "Ollama 모델 목록을 불러오는 중 오류가 발생했습니다.";
+    } finally {
+        modelsLoading.value = false;
     }
+});
+
+const handleCancel = () => {
+    // 일단은 리셋 정도만
+    selectedProject.value = "SKT Agent Bench";
+    selectedArtifact.value = "화면설계서";
+    selectedFeature.value = "로그인";
+
+    if (llmModels.value.length > 0) {
+        selectedModel.value = llmModels.value[0];
+    } else {
+        selectedModel.value = "";
+    }
+
+    selectedLanguage.value = "한글";
+    tcPrefix.value = "SAB";
+    tcCount.value = 25;
 };
 
-// 통계
-const stats = computed(() => ({
-    total: testCases.value.length,
-    high: testCases.value.filter((tc: TestCase) => tc.priority === "High")
-        .length,
-    medium: testCases.value.filter((tc: TestCase) => tc.priority === "Medium")
-        .length,
-    low: testCases.value.filter((tc: TestCase) => tc.priority === "Low").length,
-}));
-
-const hasTestCases = computed(() => testCases.value.length > 0);
+const handleSubmit = () => {
+    // TODO: 실제 자동생성 실행 API 연동
+    console.log("자동생성 실행", {
+        project: selectedProject.value,
+        artifact: selectedArtifact.value,
+        feature: selectedFeature.value,
+        model: selectedModel.value,
+        language: selectedLanguage.value,
+        tcPrefix: tcPrefix.value,
+        tcCount: tcCount.value,
+    });
+};
 </script>
 
 <template>
-    <!-- 대시보드 메인 래퍼 -->
+    <!-- 기존 페이지들과 동일한 메인 래퍼 -->
     <main class="p-6 space-y-6">
-        <!-- 페이지 헤더 -->
+        <!-- 페이지 헤더 (카드 밖) -->
         <header>
             <h1 class="text-2xl font-semibold text-gray-900">
-                QA 테스트케이스 생성
+                테스트케이스 자동생성 실행
             </h1>
             <p class="mt-1 text-sm text-gray-500">
-                PDF 문서 또는 Figma 디자인을 기반으로 테스트케이스를 자동
-                생성합니다.
+                자동 생성에 사용할 프로젝트 / 산출물 / 모델 설정을 구성합니다.
             </p>
         </header>
 
         <!-- 메인 카드 -->
-        <section class="rounded-lg bg-white p-6 shadow space-y-6">
-            <!-- 소스 타입 선택 + 생성 버튼 -->
-            <div class="flex flex-wrap items-center gap-4">
-                <div class="flex items-center space-x-6">
-                    <label class="flex cursor-pointer items-center space-x-2">
-                        <input
-                            v-model="sourceType"
-                            type="radio"
-                            value="file"
-                            class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span class="text-gray-700">📄 File</span>
-                    </label>
-
-                    <label class="flex cursor-pointer items-center space-x-2">
-                        <input
-                            v-model="sourceType"
-                            type="radio"
-                            value="figma"
-                            class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span class="text-gray-700">🎨 Figma</span>
-                    </label>
+        <section class="rounded-lg bg-white p-6 shadow space-y-8">
+            <!-- 1. 기본 정보 섹션 -->
+            <section class="space-y-4">
+                <div
+                    class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"
+                >
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">
+                            기본 정보
+                        </h2>
+                        <p class="mt-1 text-xs text-slate-500">
+                            어떤 프로젝트의 어떤 산출물 기준으로 생성할지
+                            선택합니다.
+                        </p>
+                    </div>
                 </div>
 
-                <button
-                    class="ml-auto inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="isLoading"
-                    @click="handleGenerate"
+                <div
+                    class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
                 >
-                    <span
-                        v-if="isLoading"
-                        class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-                    />
-                    <span class="mr-1"></span>
-                    <span class="ml-1">
-                        {{ isLoading ? "생성 중..." : "테스트케이스 생성" }}
+                    <!-- 왼쪽: 폼 -->
+                    <div
+                        class="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                    >
+                        <!-- 프로젝트 -->
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-slate-700"
+                                for="project"
+                            >
+                                프로젝트 명
+                            </label>
+                            <select
+                                id="project"
+                                v-model="selectedProject"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option>SKT Agent Bench</option>
+                                <option>T-Gen</option>
+                                <option>Samsung VOC</option>
+                            </select>
+                        </div>
+
+                        <!-- 산출물 -->
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-slate-700"
+                                for="artifact"
+                            >
+                                참고할 산출물
+                            </label>
+                            <select
+                                id="artifact"
+                                v-model="selectedArtifact"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option>화면설계서</option>
+                                <option>API 명세서</option>
+                                <option>요구사항 정의서</option>
+                            </select>
+                        </div>
+
+                        <!-- 기능 분류 -->
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-slate-700"
+                                for="feature"
+                            >
+                                기능 분류
+                            </label>
+                            <select
+                                id="feature"
+                                v-model="selectedFeature"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option>로그인</option>
+                                <option>회원가입</option>
+                                <option>결제</option>
+                                <option>검색</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 오른쪽: 간단 안내 -->
+                    <aside
+                        class="w-full rounded-md border border-amber-100 bg-amber-50 px-3 py-3 text-xs leading-relaxed text-amber-900 shadow-sm lg:w-64"
+                    >
+                        <p
+                            class="mb-1 border-b border-amber-200 pb-1 text-[11px] font-bold"
+                        >
+                            Note
+                        </p>
+                        프로젝트와 산출물을 선택하면<br />
+                        해당 문서를 기준으로 테스트케이스를 생성합니다.
+                    </aside>
+                </div>
+
+                <div class="mt-2">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-violet-700"
+                    >
+                        <span class="material-icons-outlined text-sm">
+                            auto_awesome
+                        </span>
+                        AI 기능 자동분류
+                    </button>
+                </div>
+            </section>
+
+            <hr class="border-slate-100" />
+
+            <!-- 2. 모델 & 언어 섹션 -->
+            <section class="space-y-4">
+                <div
+                    class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"
+                >
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">
+                            모델 & 언어
+                        </h2>
+                        <p class="mt-1 text-xs text-slate-500">
+                            Ollama에 등록된 LLM 중, 임베딩 모델을 제외한 모델을
+                            선택합니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
+                >
+                    <!-- 왼쪽: 폼 -->
+                    <div class="grid flex-1 gap-4 md:grid-cols-2">
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-slate-700"
+                                for="model"
+                            >
+                                사용할 LLM 모델
+                            </label>
+                            <select
+                                id="model"
+                                v-model="selectedModel"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option v-if="modelsLoading" disabled>
+                                    모델 목록 불러오는 중...
+                                </option>
+                                <option
+                                    v-else-if="
+                                        !modelsLoading && llmModels.length === 0
+                                    "
+                                    disabled
+                                >
+                                    사용 가능한 모델이 없습니다
+                                </option>
+                                <option
+                                    v-for="name in llmModels"
+                                    v-else
+                                    :key="name"
+                                    :value="name"
+                                >
+                                    {{ name }}
+                                </option>
+                            </select>
+                            <p
+                                v-if="modelsError"
+                                class="mt-1 text-[11px] text-red-500"
+                            >
+                                {{ modelsError }}
+                            </p>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-slate-700"
+                                for="language"
+                            >
+                                테스트 케이스 생성 언어
+                            </label>
+                            <select
+                                id="language"
+                                v-model="selectedLanguage"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option>한글</option>
+                                <option>English</option>
+                                <option>Japanese</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 오른쪽: 간단 안내 -->
+                    <aside
+                        class="w-full rounded-md border border-amber-100 bg-amber-50 px-3 py-3 text-xs leading-relaxed text-amber-900 shadow-sm lg:w-64"
+                    >
+                        <p
+                            class="mb-1 border-b border-amber-200 pb-1 text-[11px] font-bold"
+                        >
+                            Tip
+                        </p>
+                        Ollama에 등록된 모델 목록에서<br />
+                        첫 번째 임베딩 모델을 제외한 나머지만<br />
+                        선택할 수 있도록 구성되어 있습니다.
+                    </aside>
+                </div>
+            </section>
+
+            <hr class="border-slate-100" />
+
+            <!-- 3. 생성 옵션 섹션 -->
+            <section class="space-y-4">
+                <div
+                    class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"
+                >
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">
+                            생성 옵션
+                        </h2>
+                        <p class="mt-1 text-xs text-slate-500">
+                            테스트케이스 ID 규칙과 생성 개수를 정의합니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
+                >
+                    <!-- 왼쪽: 폼 -->
+                    <div class="flex-1">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-1.5">
+                                <label
+                                    class="block text-xs font-semibold text-slate-700"
+                                    for="tcPrefix"
+                                >
+                                    테스트 케이스 ID 프리픽스
+                                </label>
+                                <input
+                                    id="tcPrefix"
+                                    v-model="tcPrefix"
+                                    type="text"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="예: SAB"
+                                />
+                                <p class="mt-1 text-[11px] text-slate-400">
+                                    예) SAB_001, SAB_002 형태로 생성됩니다.
+                                </p>
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label
+                                    class="block text-xs font-semibold text-slate-700"
+                                    for="tcCount"
+                                >
+                                    생성 개수
+                                </label>
+                                <input
+                                    id="tcCount"
+                                    v-model.number="tcCount"
+                                    type="number"
+                                    min="1"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <p class="mt-1 text-[11px] text-slate-400">
+                                    최대 생성 개수를 지정합니다.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 하단 버튼 -->
+            <div
+                class="mt-4 flex items-center justify-end gap-4 border-t border-slate-100 pt-6"
+            >
+                <button
+                    type="button"
+                    class="px-4 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
+                    @click="handleCancel"
+                >
+                    취소
+                </button>
+                <button
+                    type="submit"
+                    class="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-md"
+                    @click.prevent="handleSubmit"
+                >
+                    지금 실행
+                    <span class="material-icons-outlined text-base">
+                        play_arrow
                     </span>
                 </button>
             </div>
-
-            <!-- 에러 메시지 -->
-            <div
-                v-if="error"
-                class="rounded border border-red-100 bg-red-50 p-3 text-sm text-red-700"
-            >
-                ⚠️ {{ error }}
-            </div>
-
-            <!-- 통계 카드 -->
-            <section
-                v-if="hasTestCases"
-                class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-            >
-                <!-- Total -->
-                <article
-                    class="rounded-lg bg-white p-4 shadow hover:shadow-md transition-shadow"
-                >
-                    <div class="text-2xl font-bold text-gray-900">
-                        {{ stats.total }}
-                    </div>
-                    <div class="mt-1 text-sm text-gray-500">
-                        전체 테스트 케이스
-                    </div>
-                </article>
-
-                <!-- High Priority -->
-                <article
-                    class="rounded-lg bg-white p-4 shadow hover:shadow-md transition-shadow"
-                >
-                    <div class="text-2xl font-bold text-red-600">
-                        {{ stats.high }}
-                    </div>
-                    <div class="mt-1 text-sm text-gray-500">높음 우선순위</div>
-                </article>
-
-                <!-- Medium Priority -->
-                <article
-                    class="rounded-lg bg-white p-4 shadow hover:shadow-md transition-shadow"
-                >
-                    <div class="text-2xl font-bold text-yellow-500">
-                        {{ stats.medium }}
-                    </div>
-                    <div class="mt-1 text-sm text-gray-500">중간 우선순위</div>
-                </article>
-
-                <!-- Low Priority -->
-                <article
-                    class="rounded-lg bg-white p-4 shadow hover:shadow-md transition-shadow"
-                >
-                    <div class="text-2xl font-bold text-green-600">
-                        {{ stats.low }}
-                    </div>
-                    <div class="mt-1 text-sm text-gray-500">낮음 우선순위</div>
-                </article>
-            </section>
-
-            <!-- 테스트케이스 테이블 -->
-            <section
-                v-if="hasTestCases"
-                class="overflow-hidden rounded-lg bg-white shadow"
-            >
-                <TestCaseTable :testCases="testCases" :contexts="contexts" />
-            </section>
         </section>
     </main>
 </template>
