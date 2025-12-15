@@ -20,7 +20,7 @@ export async function generateTestCases(
     return res.json();
 }
 
-export async function checkFigmaIntegration(): Promise<any> {
+export async function checkFigmaPersist(): Promise<any> {
     const res = await fetch("/api/v1/figma/info");
 
     if (!res.ok) {

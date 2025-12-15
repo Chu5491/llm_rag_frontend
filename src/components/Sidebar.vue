@@ -9,8 +9,9 @@ type NavItem = {path: string; name: string; icon?: string};
 
 const navItems: NavItem[] = [
     {path: "/", name: "Dashboard", icon: ""},
-    {path: "/testcase", name: "TC 자동생성", icon: ""},
     {path: "/project", name: "프로젝트 관리", icon: ""},
+    {path: "/generate", name: "TC 자동생성", icon: ""},
+    {path: "/testcase", name: "TC 관리", icon: ""},
     {path: "/test", name: "생성 테스트", icon: ""},
 ];
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {ref, computed, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
-import {checkFigmaIntegration} from "../services/api.js";
+import {checkFigmaPersist} from "../services/api.js";
 
 const router = useRouter();
 
@@ -148,7 +148,7 @@ const saveExternalConfig = async () => {
 
     if (system.id === "figma") {
         try {
-            const data = await checkFigmaIntegration(); // ← 여기!
+            const data = await checkFigmaPersist(); // ← 여기!
             console.log("Figma 연결 성공:", data);
 
             system.status = "connected";

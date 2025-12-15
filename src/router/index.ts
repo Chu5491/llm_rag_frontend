@@ -2,9 +2,11 @@ import {createRouter, createWebHistory, RouteRecordRaw} from "vue-router";
 import Dashboard from "../views/Dashboard.vue";
 import Project from "../views/Project.vue";
 import ProjectCreate from "../views/ProjectCreate.vue";
-import TestCase from "../views/TestCase.vue";
-import TestCaseCreate from "../views/TestCaseCreate.vue";
+import GenerateHistory from "../views/GenerateHistory.vue";
+import GenerateCreate from "../views/GenerageCreate.vue";
 import RagTest from "../views/RagTest.vue";
+import TestCase from "../views/TestCase.vue";
+import TestCaseDetail from "../views/TestCaseDetail.vue";
 
 const routes: Array<RouteRecordRaw> = [
     {
@@ -23,14 +25,25 @@ const routes: Array<RouteRecordRaw> = [
         component: ProjectCreate,
     },
     {
+        path: "/generate",
+        name: "GenerateHistory",
+        component: GenerateHistory,
+    },
+    {
+        path: "/generate/new",
+        name: "GenerateCreate",
+        component: GenerateCreate,
+    },
+    {
         path: "/testcase",
-        name: "TestCase",
+        name: "Testcase",
         component: TestCase,
     },
     {
-        path: "/testcase/new",
-        name: "TestCaseCreate",
-        component: TestCaseCreate,
+        path: "/testcase/detail/:id",
+        name: "TestCaseDetail",
+        component: TestCaseDetail,
+        props: true,
     },
     {
         path: "/test",

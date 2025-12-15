@@ -325,7 +325,7 @@ const handleSubmit = () => {
                 >
                     <!-- 왼쪽: 폼 -->
                     <div class="flex-1">
-                        <div class="grid gap-4 md:grid-cols-2">
+                        <div class="grid gap-4 md:grid-cols-3">
                             <div class="space-y-1.5">
                                 <label
                                     class="block text-xs font-semibold text-slate-700"
@@ -342,25 +342,6 @@ const handleSubmit = () => {
                                 />
                                 <p class="mt-1 text-[11px] text-slate-400">
                                     예) SAB_001, SAB_002 형태로 생성됩니다.
-                                </p>
-                            </div>
-
-                            <div class="space-y-1.5">
-                                <label
-                                    class="block text-xs font-semibold text-slate-700"
-                                    for="tcCount"
-                                >
-                                    생성 개수
-                                </label>
-                                <input
-                                    id="tcCount"
-                                    v-model.number="tcCount"
-                                    type="number"
-                                    min="1"
-                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                />
-                                <p class="mt-1 text-[11px] text-slate-400">
-                                    최대 생성 개수를 지정합니다.
                                 </p>
                             </div>
                         </div>
