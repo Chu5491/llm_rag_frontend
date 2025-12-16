@@ -49,5 +49,47 @@ export async function getOllamaModels() {
     if (!res.ok) {
         throw new Error("Ollama 모델 목록 조회에 실패했습니다.");
     }
-    return res.json(); // { models: [{ name, digest, size }, ...] }
+    return res.json();
+}
+
+export interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
+
+export interface ChatResponse {
+    success: boolean;
+    output: any;
+    raw: {
+        model: string;
+        created_at: string;
+        message: ChatMessage;
+        done: boolean;
+        done_reason: string;
+        total_duration: number;
+        load_duration: number;
+        prompt_eval_count: number;
+        prompt_eval_duration: number;
+        eval_count: number;
+        eval_duration: number;
+    };
+}
+
+export async function sendChatMessage(messages: ChatMessage[], model = "exaone3.5:2.4b"): Promise<ChatResponse> {
+    const response = await fetch("/api/v1/ollama/chat", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            messages,
+            model
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('채팅 메시지 전송에 실패했습니다.');
+    }
+    
+    return response.json();
 }

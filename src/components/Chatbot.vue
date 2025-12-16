@@ -1,0 +1,349 @@
+<template>
+    <div class="fixed bottom-4 right-6 z-50 flex flex-col items-end space-y-3">
+        <!-- 챗봇 창 -->
+        <div
+            v-if="isOpen"
+            class="w-100 h-116 bg-white rounded-lg shadow-xl flex flex-col overflow-hidden border border-gray-200"
+        >
+            <!-- 헤더 -->
+            <div
+                class="bg-indigo-600 text-white p-3 flex justify-between items-center"
+            >
+                <h3 class="font-medium">챗봇 도우미</h3>
+                <button
+                    @click="isOpen = false"
+                    class="text-white hover:text-gray-200"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                    >
+                        <path
+                            fill-rule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd"
+                        />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 채팅 내용 -->
+            <div class="flex-1 p-4 overflow-y-auto bg-gray-50">
+                <div
+                    v-for="(message, index) in messages"
+                    :key="index"
+                    :class="[
+                        'mb-4',
+                        message.sender === 'user' ? 'text-right' : 'text-left',
+                    ]"
+                >
+                    <div
+                        v-if="message.sender === 'bot'"
+                        class="prose max-w-none inline-block px-4 py-2 rounded-lg bg-white border border-gray-200"
+                        v-html="renderMarkdown(message.text)"
+                    ></div>
+                    <div
+                        v-else
+                        class="inline-block px-4 py-2 rounded-lg bg-indigo-100 text-gray-800"
+                    >
+                        {{ message.text }}
+                    </div>
+                </div>
+                <div
+                    v-if="isLoading"
+                    class="text-center py-2 text-gray-500 text-sm"
+                >
+                    답변을 생성 중입니다...
+                </div>
+            </div>
+
+            <!-- 입력창 -->
+            <div class="p-3 border-t border-gray-200 bg-white">
+                <div class="flex space-x-2">
+                    <input
+                        v-model="newMessage"
+                        @keyup.enter="sendMessage"
+                        type="text"
+                        placeholder="메시지를 입력하세요..."
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        :disabled="isLoading"
+                    />
+                    <button
+                        @click="sendMessage"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                        :disabled="isLoading || !newMessage.trim()"
+                    >
+                        전송
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 챗봇 아이콘 -->
+        <button
+            @click="toggleChat"
+            class="w-14 h-14 bg-indigo-600 rounded-full shadow-lg flex items-center justify-center text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+            :class="{'rotate-45': isOpen}"
+            aria-label="챗봇 열기"
+        >
+            <svg
+                v-if="!isOpen"
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-7 w-7"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+            </svg>
+            <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-7 w-7"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                />
+            </svg>
+        </button>
+    </div>
+</template>
+
+<script setup lang="ts">
+import {ref} from "vue";
+import {sendChatMessage} from "../services/api.js";
+import {marked} from "marked";
+
+interface Message {
+    text: string;
+    sender: "user" | "bot";
+}
+
+const isOpen = ref(false);
+const newMessage = ref("");
+const isLoading = ref(false);
+const messages = ref<Message[]>([
+    {text: "안녕하세요! 무엇을 도와드릴까요?", sender: "bot"},
+]);
+
+// 마크다운을 HTML로 변환
+const renderMarkdown = (content: string): string => {
+    return marked(content, {
+        breaks: true,
+        gfm: true,
+        headerIds: false,
+    });
+};
+
+const toggleChat = () => {
+    isOpen.value = !isOpen.value;
+    if (isOpen.value) {
+        // 채팅창을 열면 자동으로 스크롤 아래로
+        setTimeout(scrollToBottom, 100);
+    }
+};
+
+const scrollToBottom = () => {
+    const chatContainer = document.querySelector(".overflow-y-auto");
+    if (chatContainer) {
+        setTimeout(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 100);
+    }
+};
+
+const sendMessage = async () => {
+    const userMessage = newMessage.value.trim();
+    if (!userMessage || isLoading.value) return;
+
+    // 사용자 메시지 추가
+    messages.value.push({
+        text: userMessage,
+        sender: "user",
+    });
+
+    // 입력 필드 초기화
+    newMessage.value = "";
+
+    // 로딩 상태 표시
+    isLoading.value = true;
+    scrollToBottom();
+
+    try {
+        // API 서비스를 사용하여 메시지 전송
+        const response = await sendChatMessage([
+            {role: "user", content: userMessage},
+        ]);
+
+        // 성공적인 응답 처리
+        messages.value.push({
+            text: response.raw.message.content,
+            sender: "bot",
+        });
+    } catch (error) {
+        console.error("채팅 오류:", error);
+        messages.value.push({
+            text: "채팅을 처리하는 중 오류가 발생했습니다. 나중에 다시 시도해주세요.",
+            sender: "bot",
+        });
+    } finally {
+        isLoading.value = false;
+        scrollToBottom();
+    }
+};
+</script>
+
+<style scoped>
+/* 애니메이션을 위한 스타일 */
+.rotate-45 {
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+}
+
+/* 마크다운 스타일링 */
+:deep(.prose) {
+    line-height: 1.6;
+    font-size: 0.9375rem;
+    color: #1f2937;
+}
+
+:deep(.prose h1) {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin: 1em 0 0.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+:deep(.prose h2) {
+    font-size: 1.3em;
+    font-weight: 600;
+    margin: 1.2em 0 0.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+:deep(.prose h3) {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+}
+
+:deep(.prose p) {
+    margin: 0.75em 0;
+    line-height: 1.7;
+}
+
+:deep(.prose ul),
+:deep(.prose ol) {
+    margin: 0.75em 0;
+    padding-left: 1.5em;
+}
+
+:deep(.prose li) {
+    margin: 0.4em 0;
+    padding-left: 0.25em;
+}
+
+:deep(.prose pre) {
+    background-color: #f9fafb;
+    padding: 1em;
+    border-radius: 0.5em;
+    overflow-x: auto;
+    margin: 1em 0;
+    border: 1px solid #e5e7eb;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+:deep(.prose code) {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    background-color: #f3f4f6;
+    padding: 0.2em 0.4em;
+    border-radius: 0.25em;
+    font-size: 0.9em;
+}
+
+:deep(.prose pre code) {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 1em;
+}
+
+:deep(.prose a) {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+:deep(.prose a:hover) {
+    text-decoration: underline;
+    color: #4338ca;
+}
+
+:deep(.prose blockquote) {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 1em;
+    margin: 1em 0;
+    color: #6b7280;
+    font-style: italic;
+}
+
+:deep(.prose table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+:deep(.prose th),
+:deep(.prose td) {
+    border: 1px solid #e5e7eb;
+    padding: 0.5em 1em;
+    text-align: left;
+}
+
+:deep(.prose th) {
+    background-color: #f9fafb;
+    font-weight: 600;
+}
+
+:deep(.prose img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5em;
+    margin: 1em 0;
+}
+
+/* 스크롤바 스타일링 */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #c7d2fe;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #a5b4fc;
+}
+</style>

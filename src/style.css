@@ -56,6 +56,64 @@
         @apply mt-auto pt-4;
     }
 
+    /* Header Styles */
+    .header {
+        @apply fixed top-0 left-0 right-0 z-50;
+    }
+    .header-container {
+        @apply bg-white shadow-sm border-b border-gray-200;
+    }
+    .header-content {
+        @apply h-16 flex items-center px-4 lg:px-8;
+    }
+    .header-logo {
+        @apply flex items-center text-xl font-bold text-gray-900;
+    }
+    .header-nav {
+        @apply hidden md:flex items-center space-x-1;
+    }
+    .header-nav-item {
+        @apply px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors;
+    }
+    .header-nav-item-active {
+        @apply bg-indigo-50 text-indigo-700;
+    }
+    .header-actions {
+        @apply flex items-center space-x-4;
+    }
+    .header-button {
+        @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors;
+    }
+    .header-button-secondary {
+        @apply inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors;
+    }
+    .header-avatar {
+        @apply h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium cursor-pointer;
+    }
+
+
+    .footer {
+        @apply bg-white border-t border-gray-200 py-4 mt-auto;
+    }
+    .footer-container {
+        @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    }
+    .footer-content {
+        @apply flex flex-col md:flex-row justify-between items-center;
+    }
+    .footer-text {
+        @apply text-sm text-gray-500;
+    }
+    .footer-links {
+        @apply flex items-center space-x-4 mt-2 md:mt-0;
+    }
+    .footer-link {
+        @apply text-sm text-gray-500 hover:text-gray-700;
+    }
+    .footer-divider {
+        @apply text-gray-300;
+    }
+
     .status-indicator {
         @apply inline-flex items-center text-xs text-gray-500 cursor-pointer;
     }

@@ -7,6 +7,7 @@ import GenerateCreate from "../views/GenerageCreate.vue";
 import RagTest from "../views/RagTest.vue";
 import TestCase from "../views/TestCase.vue";
 import TestCaseDetail from "../views/TestCaseDetail.vue";
+import ProjectDetail from "../views/ProjectDetail.vue";
 
 const routes: Array<RouteRecordRaw> = [
     {
@@ -23,6 +24,11 @@ const routes: Array<RouteRecordRaw> = [
         path: "/project/new",
         name: "ProjectCreate",
         component: ProjectCreate,
+    },
+    {
+        path: "/project/detail/:id",
+        name: "ProjectDetail",
+        component: ProjectDetail,
     },
     {
         path: "/generate",
