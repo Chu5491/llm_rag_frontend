@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {ref, computed} from "vue";
 </script>
 
 <template>
@@ -7,7 +6,6 @@ import {ref, computed} from "vue";
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
         <header>
-            <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
             <p class="mt-1 text-sm text-gray-500">
                 어플리케이션의 전반적인 상태를 확인할 수 있습니다.
                 <br />

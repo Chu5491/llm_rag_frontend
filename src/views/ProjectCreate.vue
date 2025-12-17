@@ -202,9 +202,6 @@ onUnmounted(() => {
         <!-- 페이지 헤더 -->
         <header class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-semibold text-gray-900">
-                    Project 등록
-                </h1>
                 <p class="mt-1 text-sm text-gray-500">
                     새로운 프로젝트를 등록하고 테스트케이스 생성에 사용할 정보를
                     입력합니다.

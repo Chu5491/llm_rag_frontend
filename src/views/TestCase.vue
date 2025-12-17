@@ -2,9 +2,6 @@
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
         <header>
-            <h1 class="text-2xl font-semibold text-gray-900">
-                테스트케이스 관리
-            </h1>
             <p class="mt-1 text-sm text-gray-500">
                 생성된 테스트케이스를 확인하고 관리할 수 있습니다.
             </p>
@@ -54,110 +51,84 @@
 
             <!-- 테이블 영역 -->
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="table-container">
+                    <thead class="table-header">
                         <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell">
                                 TC ID
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell">
                                 기능
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell">
                                 타이틀
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell">
                                 중요도
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell">
                                 작성일
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell">
                                 최근 수정일
                             </th>
-                            <th
-                                class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                            >
+                            <th class="table-header-cell text-center">
                                 검증 결과
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="table-body">
                         <tr
                             v-for="testCase in filteredTestCases"
                             :key="testCase.id"
-                            class="hover:bg-gray-50 transition-colors cursor-pointer"
+                            class="table-row cursor-pointer"
                             @click="goToTestCaseDetail(testCase.id)"
                         >
-                            <td
-                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                            >
+                            <td class="table-cell text-gray-500">
                                 {{ testCase.id }}
                             </td>
-                            <td
-                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                            >
+                            <td class="table-cell text-gray-500">
                                 {{ testCase.function }}
                             </td>
-                            <td
-                                class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"
-                            >
+                            <td class="table-cell font-medium text-gray-900">
                                 {{ testCase.title }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="table-cell">
                                 <span
-                                    :class="`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    :class="`priority-tag ${
                                         testCase.priority === 'High'
-                                            ? 'bg-red-100 text-red-800'
+                                            ? 'priority-high'
                                             : testCase.priority === 'Medium'
-                                            ? 'bg-yellow-100 text-yellow-800'
-                                            : 'bg-green-100 text-green-800'
+                                            ? 'priority-medium'
+                                            : 'priority-low'
                                     }`"
                                 >
                                     {{ testCase.priority }}
                                 </span>
                             </td>
-                            <td
-                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                            >
+                            <td class="table-cell text-gray-500">
                                 {{ formatDate(testCase.createdAt) }}
                             </td>
-                            <td
-                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                            >
+                            <td class="table-cell text-gray-500">
                                 {{ formatDate(testCase.updatedAt) }}
                             </td>
-                            <td
-                                class="px-6 py-4 whitespace-nowrap text-center text-sm"
-                            >
+                            <td class="table-cell text-center">
                                 <button
-                                    @click="handleStatusClick(testCase)"
-                                    :class="`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                    @click.stop="handleStatusClick(testCase)"
+                                    :class="`status-badge ${
                                         testCase.status === 'approved'
-                                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                            ? 'status-approved'
                                             : testCase.status === 'ai'
-                                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                                            : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                            ? 'status-ai'
+                                            : 'status-rejected'
                                     }`"
                                 >
                                     {{
                                         testCase.status === "approved"
                                             ? "사용"
                                             : testCase.status === "ai"
-                                            ? "AI"
-                                            : "반려"
+                                            ? "AI 생성"
+                                            : "미사용"
                                     }}
                                 </button>
                             </td>

@@ -86,9 +86,6 @@ const statusBadgeClass = (status: GenerationStatus) => {
             class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
         >
             <div>
-                <h1 class="text-2xl font-semibold text-gray-900">
-                    자동생성 히스토리
-                </h1>
                 <p class="mt-1 text-sm text-gray-500">
                     테스트케이스 자동생성 실행 내역과 상태를 확인합니다.
                 </p>

@@ -86,9 +86,6 @@ const handleSubmit = () => {
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 (카드 밖) -->
         <header>
-            <h1 class="text-2xl font-semibold text-gray-900">
-                테스트케이스 자동생성 실행
-            </h1>
             <p class="mt-1 text-sm text-gray-500">
                 자동 생성에 사용할 프로젝트 / 산출물 / 모델 설정을 구성합니다.
             </p>

@@ -18,8 +18,8 @@ import Chatbot from "@/components/Chatbot.vue";
             <Header />
 
             <!-- 콘텐츠 영역 -->
-            <main class="flex-1 pt-16 p-6">
-                <div class="max-w-7xl mx-auto h-full">
+            <main class="main-content">
+                <div class="main-container">
                     <slot />
                 </div>
             </main>

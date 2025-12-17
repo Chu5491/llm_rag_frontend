@@ -22,9 +22,6 @@
         <section class="rounded-lg bg-white p-6 shadow space-y-8">
             <!-- Basic Info Section -->
             <div>
-                <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    기본 정보
-                </h3>
                 <div class="bg-gray-50 p-5 rounded-lg border border-gray-100">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-4">
@@ -70,51 +67,34 @@
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
                     등록된 산출물
                 </h3>
-                <div
-                    class="overflow-hidden rounded-lg border border-gray-200 shadow-sm"
-                >
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                <div class="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+                    <table class="table-container">
+                        <thead class="table-header">
                             <tr>
-                                <th
-                                    scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
+                                <th class="table-header-cell">
                                     유형
                                 </th>
-                                <th
-                                    scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
+                                <th class="table-header-cell">
                                     파일명
                                 </th>
-                                <th
-                                    scope="col"
-                                    class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
+                                <th class="table-header-cell text-center">
                                     데이터 분석
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="table-body">
                             <tr
                                 v-for="artifact in project.artifacts"
                                 :key="artifact.id"
-                                class="hover:bg-gray-50 transition-colors"
+                                class="table-row"
                             >
-                                <td
-                                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"
-                                >
+                                <td class="table-cell font-medium text-gray-900">
                                     {{ artifact.type }}
                                 </td>
-                                <td
-                                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                                >
+                                <td class="table-cell text-gray-500">
                                     {{ artifact.name }}
                                 </td>
-                                <td
-                                    class="px-6 py-4 whitespace-nowrap text-center"
-                                >
+                                <td class="table-cell text-center">
                                     <span
                                         :class="{
                                             'bg-green-100 text-green-800':

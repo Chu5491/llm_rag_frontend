@@ -144,9 +144,6 @@ onMounted(() => {
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
         <header>
-            <h1 class="text-2xl font-semibold text-gray-900">
-                테스트케이스 {{ isEditMode ? "조회 / 수정" : "생성" }}
-            </h1>
             <p class="mt-1 text-sm text-gray-500">
                 테스트케이스를 {{ isEditMode ? "수정" : "새로 생성" }}합니다.
             </p>

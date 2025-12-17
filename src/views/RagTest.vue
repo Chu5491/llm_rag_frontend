@@ -70,9 +70,6 @@ const hasTestCases = computed(() => testCases.value.length > 0);
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
         <header>
-            <h1 class="text-2xl font-semibold text-gray-900">
-                QA 테스트케이스 생성
-            </h1>
             <p class="mt-1 text-sm text-gray-500">
                 PDF 문서 또는 Figma 디자인을 기반으로 테스트케이스를 자동
                 생성합니다.

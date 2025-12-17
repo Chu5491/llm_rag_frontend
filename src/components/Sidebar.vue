@@ -11,11 +11,11 @@ const route = useRoute();
 // 일단 네비게이션 아이템 정의.
 
 const navItems = [
-    {path: "/", name: "Dashboard", icon: "Home"},
-    {path: "/project", name: "프로젝트 관리", icon: "Folder"},
-    {path: "/generate", name: "TC 자동생성", icon: "Zap"},
-    {path: "/testcase", name: "TC 관리", icon: "List"},
-    {path: "/test", name: "생성 테스트", icon: "Test"},
+    {path: "/", name: "Dashboard", icon: "dashboard"},
+    {path: "/project", name: "프로젝트 관리", icon: "folder"},
+    {path: "/generate", name: "TC 자동생성", icon: "auto_awesome"},
+    {path: "/testcase", name: "TC 관리", icon: "list_alt"},
+    {path: "/test", name: "생성 테스트", icon: "science"},
 ];
 
 const isActive = (path: string) => {
@@ -45,15 +45,7 @@ onUnmounted(() => {
     }
 });
 
-// 아이콘 렌더링 헬퍼 (Heroicons가 없다는 가정하에 SVG 직접 사용)
-// 간단한 SVG 아이콘들
-const icons: Record<string, string> = {
-    Home: '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />',
-    Folder: '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />',
-    Zap: '<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />',
-    List: '<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />',
-    Test: '<path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />',
-};
+// Material Icons 사용
 </script>
 
 <template>
@@ -87,20 +79,15 @@ const icons: Record<string, string> = {
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                 ]"
             >
-                <!-- Icon SVG -->
-                <svg
-                    class="mr-3 h-5 w-5 shrink-0 transition-colors"
+                <!-- Material Icon -->
+                <span 
+                    class="material-symbols-outlined mr-3 text-xl transition-colors"
                     :class="
                         isActive(item.path)
                             ? 'text-indigo-600'
                             : 'text-gray-400 group-hover:text-gray-500'
                     "
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
-                    v-html="icons[item.icon as string] || ''"
-                ></svg>
+                >{{ item.icon }}</span>
                 {{ item.name }}
             </RouterLink>
         </nav>
