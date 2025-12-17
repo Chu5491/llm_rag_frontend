@@ -144,8 +144,7 @@ const renderMarkdown = (content: string): string => {
     return marked(content, {
         breaks: true,
         gfm: true,
-        headerIds: false,
-    });
+    }) as string;
 };
 
 const toggleChat = () => {
