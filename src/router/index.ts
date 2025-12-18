@@ -3,7 +3,7 @@ import Dashboard from "../views/Dashboard.vue";
 import Project from "../views/Project.vue";
 import ProjectCreate from "../views/ProjectCreate.vue";
 import GenerateHistory from "../views/GenerateHistory.vue";
-import GenerateCreate from "../views/GenerageCreate.vue";
+import GenerateCreate from "../views/GenerateCreate.vue";
 import RagTest from "../views/RagTest.vue";
 import TestCase from "../views/TestCase.vue";
 import TestCaseDetail from "../views/TestCaseDetail.vue";

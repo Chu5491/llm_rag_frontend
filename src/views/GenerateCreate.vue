@@ -33,14 +33,12 @@ onMounted(async () => {
         const data = await getOllamaModels();
         const models: OllamaModel[] = data.models ?? [];
 
-        // 👉 맨 위가 임베딩 모델(bge)이니까, 일단 0번 인덱스는 빼고 사용
-        const filtered = models.slice(1).map((m) => m.name);
+        llmModels.value = models
+            .filter((m) => !m.name.includes("bge"))
+            .map((m) => m.name);
 
-        llmModels.value = filtered;
-
-        // 기본 선택값 세팅
-        if (filtered.length > 0) {
-            selectedModel.value = filtered[0];
+        if (selectedModel.value === "") {
+            selectedModel.value = llmModels.value[0];
         }
     } catch (e: any) {
         modelsError.value =

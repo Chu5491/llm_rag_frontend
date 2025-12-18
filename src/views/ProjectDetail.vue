@@ -3,9 +3,6 @@
         <!-- Header Section -->
         <header class="flex justify-between items-start">
             <div>
-                <h1 class="text-2xl font-semibold text-gray-900">
-                    프로젝트 상세 정보
-                </h1>
                 <p class="mt-1 text-sm text-gray-500">
                     등록된 프로젝트의 상세 정보를 확인할 수 있습니다.
                 </p>
@@ -67,16 +64,14 @@
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
                     등록된 산출물
                 </h3>
-                <div class="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+                <div
+                    class="overflow-hidden rounded-lg border border-gray-200 shadow-sm"
+                >
                     <table class="table-container">
                         <thead class="table-header">
                             <tr>
-                                <th class="table-header-cell">
-                                    유형
-                                </th>
-                                <th class="table-header-cell">
-                                    파일명
-                                </th>
+                                <th class="table-header-cell">유형</th>
+                                <th class="table-header-cell">파일명</th>
                                 <th class="table-header-cell text-center">
                                     데이터 분석
                                 </th>
@@ -88,7 +83,9 @@
                                 :key="artifact.id"
                                 class="table-row"
                             >
-                                <td class="table-cell font-medium text-gray-900">
+                                <td
+                                    class="table-cell font-medium text-gray-900"
+                                >
                                     {{ artifact.type }}
                                 </td>
                                 <td class="table-cell text-gray-500">

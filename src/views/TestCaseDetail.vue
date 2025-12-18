@@ -3,12 +3,6 @@ import {ref, computed, onMounted} from "vue";
 import {useRoute, useRouter} from "vue-router";
 import draggable from "vuedraggable";
 
-const route = useRoute();
-const router = useRouter();
-
-// URL 파라미터를 통해 수정 모드인지 확인
-const isEditMode = computed(() => route.name === "TestCaseEdit");
-
 // 폼 데이터
 const formData = ref({
     id: "TCID-001",
@@ -131,13 +125,6 @@ const addReply = (commentId) => {
 const handleSubmit = () => {
     console.log("Form submitted:", formData.value);
 };
-
-// 수정 모드일 경우 기존 데이터 로드
-onMounted(() => {
-    if (isEditMode.value) {
-        // loadTestCase(route.params.id)
-    }
-});
 </script>
 
 <template>
@@ -145,7 +132,7 @@ onMounted(() => {
         <!-- 페이지 헤더 -->
         <header>
             <p class="mt-1 text-sm text-gray-500">
-                테스트케이스를 {{ isEditMode ? "수정" : "새로 생성" }}합니다.
+                테스트케이스 상세 등록 정보를 조회합니다.
             </p>
         </header>
 
@@ -159,13 +146,14 @@ onMounted(() => {
                         <label class="block text-sm font-bold text-gray-700">
                             TC ID
                         </label>
-                        <input
-                            v-model="formData.id"
-                            type="text"
-                            class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                            :disabled="isEditMode"
-                            placeholder="TC ID 입력"
-                        />
+                        <div class="max-w-md">
+                            <input
+                                v-model="formData.id"
+                                type="text"
+                                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                                placeholder="TC ID 입력"
+                            />
+                        </div>
                     </div>
 
                     <!-- Priority (Battery Icons) -->
@@ -379,6 +367,7 @@ onMounted(() => {
                                 >
                                     <input
                                         v-model="formData.isVerified"
+                                        name="isVerified"
                                         type="radio"
                                         :value="true"
                                         class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
@@ -392,6 +381,7 @@ onMounted(() => {
                                 >
                                     <input
                                         v-model="formData.isVerified"
+                                        name="isVerified"
                                         type="radio"
                                         :value="false"
                                         class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
@@ -418,7 +408,7 @@ onMounted(() => {
                         type="submit"
                         class="px-12 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
                     >
-                        {{ isEditMode ? "수정" : "저장" }}
+                        저장
                     </button>
                 </div>
             </form>
