@@ -1,18 +1,12 @@
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
 import {getOllamaModels} from "../services/api.js";
+import type {OllamaModel} from "../types/ollama.js";
 
 // 폼 상태 (지금은 목업용 기본값)
 const selectedProject = ref("SKT Agent Bench");
 const selectedArtifact = ref("화면설계서");
 const selectedFeature = ref("로그인");
-
-// Ollama LLM 모델 목록 (임베딩 제외)
-type OllamaModel = {
-    name: string;
-    digest: string;
-    size: number;
-};
 
 const llmModels = ref<string[]>([]);
 const selectedModel = ref<string>("");

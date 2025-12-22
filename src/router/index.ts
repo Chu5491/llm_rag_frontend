@@ -8,6 +8,7 @@ import RagTest from "../views/RagTest.vue";
 import TestCase from "../views/TestCase.vue";
 import TestCaseDetail from "../views/TestCaseDetail.vue";
 import ProjectDetail from "../views/ProjectDetail.vue";
+import Setting from "../views/Setting.vue";
 
 const routes: Array<RouteRecordRaw> = [
     {
@@ -55,6 +56,11 @@ const routes: Array<RouteRecordRaw> = [
         path: "/test",
         name: "test",
         component: RagTest,
+    },
+    {
+        path: "/setting",
+        name: "Setting",
+        component: Setting,
     },
 ];
 

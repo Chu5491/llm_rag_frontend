@@ -16,6 +16,7 @@ const navItems = [
     {path: "/generate", name: "TC 자동생성", icon: "auto_awesome"},
     {path: "/testcase", name: "TC 관리", icon: "list_alt"},
     {path: "/test", name: "생성 테스트", icon: "science"},
+    {path: "/setting", name: "환경설정", icon: "settings"},
 ];
 
 const isActive = (path: string) => {
@@ -80,14 +81,15 @@ onUnmounted(() => {
                 ]"
             >
                 <!-- Material Icon -->
-                <span 
+                <span
                     class="material-symbols-outlined mr-3 text-xl transition-colors"
                     :class="
                         isActive(item.path)
                             ? 'text-indigo-600'
                             : 'text-gray-400 group-hover:text-gray-500'
                     "
-                >{{ item.icon }}</span>
+                    >{{ item.icon }}</span
+                >
                 {{ item.name }}
             </RouterLink>
         </nav>
