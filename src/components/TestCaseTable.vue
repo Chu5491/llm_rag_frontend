@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref, computed} from "vue";
-import type {TestCase} from "../types/testcase";
+import type {TestCase} from "../types/testcase.js";
 import SortIndicator from "./SortIndicator.vue";
 
 const props = defineProps<{testCases?: TestCase[]; contexts?: any[]}>();

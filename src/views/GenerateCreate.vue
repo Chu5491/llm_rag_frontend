@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
-import {getOllamaModels} from "../services/api.js";
+import {getOllamaModels, startGeneration} from "../services/api.js";
 import type {OllamaModel} from "../types/ollama.js";
+import router from "../router/index.js";
 
 // 폼 상태 (지금은 목업용 기본값)
+const title = ref("SKT Agent Bench 자동 생성");
 const selectedProject = ref("SKT Agent Bench");
 const selectedArtifact = ref("화면설계서");
 const selectedFeature = ref("로그인");
@@ -16,7 +18,6 @@ const modelsError = ref<string | null>(null);
 const selectedLanguage = ref("한글");
 
 const tcPrefix = ref("SAB");
-const tcCount = ref<number | null>(25);
 
 // Ollama 모델 목록 가져오기
 onMounted(async () => {
@@ -44,6 +45,7 @@ onMounted(async () => {
 
 const handleCancel = () => {
     // 일단은 리셋 정도만
+    title.value = "SKT Agent Bench 자동 생성";
     selectedProject.value = "SKT Agent Bench";
     selectedArtifact.value = "화면설계서";
     selectedFeature.value = "로그인";
@@ -56,20 +58,35 @@ const handleCancel = () => {
 
     selectedLanguage.value = "한글";
     tcPrefix.value = "SAB";
-    tcCount.value = 25;
 };
 
+const isSubmitting = ref(false);
+const generationStatus = ref<"idle" | "generating" | "done">("idle");
 const handleSubmit = () => {
-    // TODO: 실제 자동생성 실행 API 연동
-    console.log("자동생성 실행", {
-        project: selectedProject.value,
-        artifact: selectedArtifact.value,
-        feature: selectedFeature.value,
+    if (isSubmitting.value) return;
+    isSubmitting.value = true;
+    generationStatus.value = "generating";
+
+    startGeneration({
+        project_id: 1,
+        title: title.value,
         model: selectedModel.value,
         language: selectedLanguage.value,
         tcPrefix: tcPrefix.value,
-        tcCount: tcCount.value,
+    }).catch((error) => {
+        console.error("자동 생성 시작 중 오류 발생:", error);
     });
+
+    setTimeout(() => {
+        generationStatus.value = "done";
+    }, 1500);
+
+    setTimeout(() => {
+        router.push("/generate").finally(() => {
+            isSubmitting.value = false;
+            generationStatus.value = "idle";
+        });
+    }, 2500);
 };
 </script>
 
@@ -100,7 +117,32 @@ const handleSubmit = () => {
                         </p>
                     </div>
                 </div>
-
+                <div
+                    class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
+                >
+                    <!-- 왼쪽: 폼 -->
+                    <div
+                        class="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                    >
+                        <!-- 프로젝트 -->
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-slate-700"
+                                for="title"
+                            >
+                                수행 타이틀
+                            </label>
+                            <input
+                                id="title"
+                                v-model="title"
+                                type="text"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                placeholder="예: SAB"
+                            />
+                        </div>
+                    </div>
+                </div>
+                <hr class="border-slate-100" />
                 <div
                     class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
                 >
@@ -271,7 +313,6 @@ const handleSubmit = () => {
                             >
                                 <option>한글</option>
                                 <option>English</option>
-                                <option>Japanese</option>
                             </select>
                         </div>
                     </div>
@@ -351,10 +392,12 @@ const handleSubmit = () => {
                 </button>
                 <button
                     type="submit"
-                    class="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-md"
+                    :disabled="isSubmitting"
+                    class="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     @click.prevent="handleSubmit"
                 >
-                    지금 실행
+                    <span v-if="isSubmitting">처리 중...</span>
+                    <span v-else>자동 생성 시작</span>
                     <span class="material-icons-outlined text-base">
                         play_arrow
                     </span>
@@ -362,4 +405,41 @@ const handleSubmit = () => {
             </div>
         </section>
     </main>
+    <div
+        v-if="generationStatus !== 'idle'"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    >
+        <div
+            class="flex min-w-[260px] flex-col items-center gap-3 rounded-lg bg-white px-6 py-5 text-center shadow-lg"
+        >
+            <!-- 로딩 스피너 -->
+            <div
+                v-if="generationStatus === 'generating'"
+                class="h-9 w-9 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"
+            />
+            <!-- 완료 체크 -->
+            <div
+                v-else
+                class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    class="h-6 w-6 text-emerald-600"
+                >
+                    <path
+                        d="M20.285 6.707a1 1 0 0 0-1.414-1.414L9 15.164l-3.871-3.87a1 1 0 1 0-1.414 1.414l4.578 4.577a1 1 0 0 0 1.414 0l10.578-10.578Z"
+                        fill="currentColor"
+                    />
+                </svg>
+            </div>
+            <p class="mt-1 text-sm text-gray-800">
+                {{
+                    generationStatus === "generating"
+                        ? "테스트 케이스 생성을 준비합니다..."
+                        : "자동 생성을 시작합니다! 생성 내역 페이지로 이동합니다."
+                }}
+            </p>
+        </div>
+    </div>
 </template>
