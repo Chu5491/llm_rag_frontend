@@ -192,11 +192,22 @@ export const startGeneration = async (
 
 // RAG 생성 작업 중단
 export async function cancelGeneration(historyId: number): Promise<any> {
-    const res = await fetch(`/api/v1/rag/cancel/${historyId}`, {
+    const res = await fetch(`/api/v1/history/cancel/${historyId}`, {
         method: "POST",
     });
     if (!res.ok) {
         throw new Error("작업 중단에 실패했습니다.");
+    }
+    return res.json();
+}
+
+// RAG 생성 작업 재시도
+export async function retryGeneration(historyId: number): Promise<any> {
+    const res = await fetch(`/api/v1/history/${historyId}/retry`, {
+        method: "POST",
+    });
+    if (!res.ok) {
+        throw new Error("재시도에 실패했습니다.");
     }
     return res.json();
 }

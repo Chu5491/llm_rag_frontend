@@ -5,6 +5,7 @@ import {
     fetchHistoryDetail,
     pollRunningItems,
     cancelGeneration,
+    retryGeneration,
 } from "../services/api.js";
 
 import type {
@@ -227,6 +228,24 @@ const handleCancel = async (id: number) => {
     } catch (err) {
         console.error("작업 중단 중 오류 발생:", err);
         alert("작업 중단에 실패했습니다.");
+    }
+};
+// 작업을 재시도합니다.
+const handleRetry = async (id: number) => {
+    if (
+        !confirm(
+            "이 작업을 다시 실행하시겠습니까? (재실행 시 기존 결과가 덮어씌워질 수 있습니다)"
+        )
+    )
+        return;
+
+    try {
+        await retryGeneration(id);
+        // 즉시 목록 갱신
+        loadHistories();
+    } catch (err) {
+        console.error("작업 재시도 중 오류 발생:", err);
+        alert("작업 재시도 요청에 실패했습니다.");
     }
 };
 </script>
@@ -469,6 +488,7 @@ const handleCancel = async (id: number) => {
                                     item.status === 'cancelled'
                                 "
                                 type="button"
+                                @click.stop="handleRetry(item.id)"
                                 class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100"
                             >
                                 <span class="material-icons-outlined text-sm">
