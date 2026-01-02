@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import {ref, computed, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
-import {checkFigmaPersist} from "../services/api.js";
+import {checkFigmaPersist, createProject} from "../services/api.js";
+
+import type {
+    ArtifactItem,
+    ExternalSystemItem,
+    ProjectCreate,
+} from "../types/project.js";
 
 const router = useRouter();
-
-const projectName = ref("");
-const projectDescription = ref("");
 
 // === 저장 상태 ===
 // idle  : 평상시
@@ -16,37 +19,36 @@ const saveStatus = ref<"idle" | "saving" | "done">("idle");
 let saveTimer: number | undefined;
 let redirectTimer: number | undefined;
 
+// 1. 프로젝트 기본 정보
+const projectBase = ref({
+    name: "",
+    description: "",
+});
+
 // 산출물 타입 선택
 const artifactType = ref("화면설계서");
 
-type ArtifactRow = {
-    id: number;
-    type: string;
-    name: string;
-    hasFile: boolean;
-    selected: boolean;
-};
-
-const artifacts = ref<ArtifactRow[]>([
+// 산출물 목록 (ArtifactItem 확장)
+const artifacts = ref<ArtifactItem[]>([
     {
         id: 1,
-        type: "요구사항정의서",
-        name: "요구사항정의서v1",
-        hasFile: true,
+        artifact_type: "요구사항정의서",
+        name: "",
+        has_file: false,
         selected: true,
     },
     {
         id: 2,
-        type: "화면설계서",
-        name: "화면설계서v1",
-        hasFile: true,
+        artifact_type: "화면설계서",
+        name: "",
+        has_file: false,
         selected: true,
     },
     {
         id: 3,
-        type: "이외",
-        name: "API 정의서v1",
-        hasFile: true,
+        artifact_type: "이외",
+        name: "",
+        has_file: false,
         selected: true,
     },
 ]);
@@ -56,34 +58,69 @@ let nextArtifactId = 4;
 const addArtifactRow = () => {
     artifacts.value.push({
         id: nextArtifactId++,
-        type: artifactType.value,
+        artifact_type: artifactType.value,
         name: "",
-        hasFile: false,
+        has_file: false,
         selected: true,
     });
 };
 
-const removeArtifactRow = (id: number) => {
+const removeArtifactRow = (id?: number) => {
+    if (id === undefined) return;
     artifacts.value = artifacts.value.filter((row) => row.id !== id);
 };
 
-/* 외부 시스템 타입 정의 */
-type ExternalSystemId = "jira" | "figma";
-type ExternalStatus = "idle" | "connected" | "error";
+// 파일 선택 처리
+const fileInput = ref<HTMLInputElement | null>(null);
+const currentArtifactId = ref<number | null>(null);
 
-type ExternalSystem = {
-    id: ExternalSystemId;
-    label: string;
-    description: string;
-    enabled: boolean;
-    pat: string;
-    url: string;
-    status: ExternalStatus;
+const triggerFileInput = (artifactId?: number) => {
+    if (artifactId === undefined || !fileInput.value) return;
+    currentArtifactId.value = artifactId;
+    fileInput.value.value = ""; // 초기화하여 같은 파일 다시 선택 가능하게 함
+    fileInput.value.click();
 };
 
-const externalSystems = ref<ExternalSystem[]>([
+const handleFileChange = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    if (
+        !target.files ||
+        target.files.length === 0 ||
+        currentArtifactId.value === null
+    ) {
+        return;
+    }
+
+    const file = target.files[0];
+    const artifactIndex = artifacts.value.findIndex(
+        (a) => a.id === currentArtifactId.value
+    );
+
+    if (artifactIndex !== -1) {
+        artifacts.value[artifactIndex].file = file;
+        artifacts.value[artifactIndex].has_file = true;
+        // 파일명이 너무 길면 잘라서 표시할 수도 있음, 여기선 전체 저장
+        // artifacts.value[artifactIndex].name = file.name; // 필요 시 이름도 자동 채움
+    }
+
+    currentArtifactId.value = null;
+};
+
+const removeFile = (artifactId?: number) => {
+    if (artifactId === undefined) return;
+    const artifact = artifacts.value.find((a) => a.id === artifactId);
+    if (artifact) {
+        artifact.file = undefined;
+        artifact.has_file = false;
+    }
+};
+
+/* 외부 시스템 타입 정의 - ExternalSystemItem 사용 */
+type ExternalSystemId = "jira" | "figma";
+
+const externalSystems = ref<ExternalSystemItem[]>([
     {
-        id: "jira",
+        system_type: "jira",
         label: "Jira",
         description: "이슈/티켓 관리용 Jira 프로젝트를 연동합니다.",
         enabled: false,
@@ -92,7 +129,7 @@ const externalSystems = ref<ExternalSystem[]>([
         status: "idle",
     },
     {
-        id: "figma",
+        system_type: "figma",
         label: "Figma",
         description: "디자인 산출물을 기반으로 테스트케이스를 생성합니다.",
         enabled: false,
@@ -108,8 +145,9 @@ const activeExternalPopup = ref<ExternalSystemId | null>(null);
 /* 팝업에서 사용하는 시스템 객체 */
 const activeExternalSystem = computed(
     () =>
-        externalSystems.value.find((s) => s.id === activeExternalPopup.value) ??
-        null
+        externalSystems.value.find(
+            (s) => s.system_type === activeExternalPopup.value
+        ) ?? null
 );
 
 /* 팝업 내 에러 메시지 */
@@ -117,7 +155,7 @@ const popupError = ref<string | null>(null);
 
 /* 카드 오른쪽 토글 클릭 시 */
 const toggleExternalSystem = (id: ExternalSystemId) => {
-    const system = externalSystems.value.find((s) => s.id === id);
+    const system = externalSystems.value.find((s) => s.system_type === id);
     if (!system) return;
 
     // off → on 되는 순간에만 팝업 띄우기
@@ -146,9 +184,9 @@ const saveExternalConfig = async () => {
 
     popupError.value = null;
 
-    if (system.id === "figma") {
+    if (system.system_type === "figma") {
         try {
-            const data = await checkFigmaPersist(); // ← 여기!
+            const data = await checkFigmaPersist();
             console.log("Figma 연결 성공:", data);
 
             system.status = "connected";
@@ -166,19 +204,37 @@ const saveExternalConfig = async () => {
 
 const handleCancel = () => {
     if (saveStatus.value !== "idle") return; // 저장 중/완료 표시 중에는 취소 막기
-    projectName.value = "";
-    projectDescription.value = "";
+    projectBase.value.name = "";
+    projectBase.value.description = "";
     router.push("/project");
 };
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
     if (saveStatus.value !== "idle") return;
 
     // 1단계: 저장 중 상태로
     saveStatus.value = "saving";
 
-    // 5초 동안 임베딩/저장하는 척
-    saveTimer = window.setTimeout(() => {
+    try {
+        // UI용 필드 제거 및 데이터 정제
+        const payload: ProjectCreate = {
+            name: projectBase.value.name,
+            description: projectBase.value.description,
+            artifacts: artifacts.value.map((a) => ({
+                artifact_type: a.artifact_type,
+                name: a.name,
+                has_file: a.has_file,
+            })),
+            external_systems: externalSystems.value.map((e) => ({
+                system_type: e.system_type,
+                url: e.url,
+                enabled: e.enabled,
+            })),
+        };
+
+        // API 호출
+        await createProject(payload);
+
         // 2단계: 완료 상태로 전환
         saveStatus.value = "done";
 
@@ -187,7 +243,11 @@ const handleSubmit = () => {
             saveStatus.value = "idle";
             router.push("/project");
         }, 1500);
-    }, 5000);
+    } catch (error) {
+        console.error("프로젝트 생성 실패:", error);
+        alert("프로젝트 생성에 실패했습니다. 다시 시도해주세요.");
+        saveStatus.value = "idle";
+    }
 };
 
 onUnmounted(() => {
@@ -216,7 +276,7 @@ onUnmounted(() => {
                         1. 프로젝트 이름이 무엇인가요?
                     </label>
                     <input
-                        v-model="projectName"
+                        v-model="projectBase.name"
                         type="text"
                         placeholder="프로젝트 명"
                         class="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -228,7 +288,7 @@ onUnmounted(() => {
                         2. 프로젝트를 간단하게 설명해주세요
                     </label>
                     <textarea
-                        v-model="projectDescription"
+                        v-model="projectBase.description"
                         rows="5"
                         placeholder="프로젝트 설명"
                         class="w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -265,6 +325,14 @@ onUnmounted(() => {
                             >
                         </button>
                     </div>
+
+                    <!-- 숨겨진 파일 입력 -->
+                    <input
+                        ref="fileInput"
+                        type="file"
+                        class="hidden"
+                        @change="handleFileChange"
+                    />
 
                     <!-- 산출물 테이블 -->
                     <div class="overflow-x-auto">
@@ -306,7 +374,7 @@ onUnmounted(() => {
                                     <td
                                         class="px-4 py-4 font-medium text-slate-700"
                                     >
-                                        {{ row.type }}
+                                        {{ row.artifact_type }}
                                     </td>
                                     <td class="px-4 py-4 text-slate-600">
                                         <input
@@ -317,12 +385,41 @@ onUnmounted(() => {
                                         />
                                     </td>
                                     <td class="px-4 py-4">
-                                        <button
-                                            type="button"
-                                            class="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600"
-                                        >
-                                            <span>파일 선택</span>
-                                        </button>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                v-if="!row.has_file"
+                                                type="button"
+                                                class="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600"
+                                                @click="
+                                                    triggerFileInput(row.id)
+                                                "
+                                            >
+                                                <span>파일 선택</span>
+                                            </button>
+                                            <div
+                                                v-else
+                                                class="flex items-center gap-1"
+                                            >
+                                                <span
+                                                    class="max-w-[150px] truncate text-[15px] text-slate-700 underline decoration-slate-400 underline-offset-2"
+                                                >
+                                                    {{
+                                                        row.file?.name ||
+                                                        "첨부된 파일"
+                                                    }}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    class="text-slate-400 hover:text-red-500"
+                                                    @click="removeFile(row.id)"
+                                                >
+                                                    <span
+                                                        class="material-icons-outlined"
+                                                        >close</span
+                                                    >
+                                                </button>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 text-right">
                                         <button
@@ -350,7 +447,7 @@ onUnmounted(() => {
                     <div class="grid gap-4 md:grid-cols-2">
                         <article
                             v-for="ext in externalSystems"
-                            :key="ext.id"
+                            :key="ext.system_type"
                             class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm"
                         >
                             <div class="flex items-start gap-3">
@@ -358,12 +455,14 @@ onUnmounted(() => {
                                 <div
                                     class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white"
                                     :class="
-                                        ext.id === 'jira'
+                                        ext.system_type === 'jira'
                                             ? 'bg-blue-600'
                                             : 'bg-violet-500'
                                     "
                                 >
-                                    <span v-if="ext.id === 'jira'">Jr</span>
+                                    <span v-if="ext.system_type === 'jira'"
+                                        >Jr</span
+                                    >
                                     <span v-else>Fg</span>
                                 </div>
 
@@ -388,7 +487,9 @@ onUnmounted(() => {
                                             ? 'bg-emerald-500'
                                             : 'bg-slate-300'
                                     "
-                                    @click="toggleExternalSystem(ext.id)"
+                                    @click="
+                                        toggleExternalSystem(ext.system_type)
+                                    "
                                 >
                                     <span
                                         class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200"

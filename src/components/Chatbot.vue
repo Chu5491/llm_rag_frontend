@@ -30,7 +30,10 @@
             </div>
 
             <!-- 채팅 내용 -->
-            <div class="flex-1 p-4 overflow-y-auto bg-gray-50">
+            <div
+                ref="chatContainerRef"
+                class="flex-1 p-4 overflow-y-auto bg-gray-50"
+            >
                 <div
                     v-for="(message, index) in messages"
                     :key="index"
@@ -123,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref} from "vue";
+import {ref, nextTick} from "vue";
 import {sendChatMessage} from "../services/api.js";
 import {marked} from "marked";
 
@@ -133,6 +136,7 @@ interface Message {
 }
 
 const isOpen = ref(false);
+const chatContainerRef = ref<HTMLElement | null>(null);
 const newMessage = ref("");
 const isLoading = ref(false);
 const messages = ref<Message[]>([
@@ -150,17 +154,14 @@ const renderMarkdown = (content: string): string => {
 const toggleChat = () => {
     isOpen.value = !isOpen.value;
     if (isOpen.value) {
-        // 채팅창을 열면 자동으로 스크롤 아래로
-        setTimeout(scrollToBottom, 100);
+        scrollToBottom();
     }
 };
 
-const scrollToBottom = () => {
-    const chatContainer = document.querySelector(".overflow-y-auto");
-    if (chatContainer) {
-        setTimeout(() => {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }, 100);
+const scrollToBottom = async () => {
+    await nextTick();
+    if (chatContainerRef.value) {
+        chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight;
     }
 };
 
