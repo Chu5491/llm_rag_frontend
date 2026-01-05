@@ -11,7 +11,7 @@
         @apply flex-1 pt-4 p-6;
     }
     .main-container {
-        @apply max-w-7xl mx-auto h-full;
+        @apply max-w-full mx-auto h-full;
     }
 
     /* ======================== */

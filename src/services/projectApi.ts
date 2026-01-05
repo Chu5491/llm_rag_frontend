@@ -12,13 +12,58 @@ import type {
 export async function createProject(
     data: ProjectCreate
 ): Promise<ProjectResponse> {
+    const formData = new FormData();
+
+    // 1. 기본 필드
+    formData.append("name", data.name);
+    formData.append("service_type", data.service_type);
+    if (data.description) {
+        formData.append("description", data.description);
+    }
+
+    // 2. Artifacts 처리 (파일이 있는 경우 name을 filename으로 강제)
+    const processedArtifacts = data.artifacts.map((artifact) => {
+        // 파일이 있는 경우
+        if (artifact.file) {
+            // 파일을 FormData에 추가
+            formData.append("files", artifact.file);
+            // 백엔드 매핑을 위해 name을 파일명으로 교체하여 반환
+            return {
+                ...artifact,
+                name: artifact.file.name,
+                file: undefined, // JSON 변환 시 제외
+            };
+        }
+        // 파일이 없는 경우 그대로 사용
+        return artifact;
+    });
+
+    formData.append("artifacts_json", JSON.stringify(processedArtifacts));
+
+    // 3. External Systems 처리
+    formData.append(
+        "external_systems_json",
+        JSON.stringify(data.external_systems)
+    );
+
+    // 4. 전송 (Content-Type 헤더 제거 -> 브라우저가 boundary 자동 설정)
     const res = await fetch("/api/v1/projects/", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(data),
+        body: formData,
     });
+
     if (!res.ok) {
-        throw new Error("프로젝트 생성에 실패했습니다.");
+        // 에러 상세 메시지 파싱 시도
+        let errorMessage = "프로젝트 생성에 실패했습니다.";
+        try {
+            const errorData = await res.json();
+            if (errorData.detail) {
+                errorMessage = errorData.detail;
+            }
+        } catch (e) {
+            // ignore
+        }
+        throw new Error(errorMessage);
     }
     return res.json();
 }
@@ -41,7 +86,7 @@ export async function fetchProjects(
 
 // 프로젝트 상세 조회
 export async function fetchProjectDetail(
-    projectId: string
+    projectId: number
 ): Promise<ProjectResponse> {
     const res = await fetch(`/api/v1/projects/${projectId}`);
     if (!res.ok) {
@@ -52,7 +97,7 @@ export async function fetchProjectDetail(
 
 // 프로젝트 수정
 export async function updateProject(
-    projectId: string,
+    projectId: number,
     data: ProjectUpdate
 ): Promise<ProjectResponse> {
     const res = await fetch(`/api/v1/projects/${projectId}`, {
@@ -67,7 +112,7 @@ export async function updateProject(
 }
 
 // 프로젝트 삭제
-export async function deleteProject(projectId: string): Promise<void> {
+export async function deleteProject(projectId: number): Promise<void> {
     const res = await fetch(`/api/v1/projects/${projectId}`, {
         method: "DELETE",
     });

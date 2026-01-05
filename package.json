@@ -11,8 +11,11 @@
         "lint": "eslint . --ext .ts,.vue,.js"
     },
     "dependencies": {
+        "@fontsource/inter": "^5.2.8",
         "axios": "^1.7.7",
         "marked": "^17.0.1",
+        "material-icons": "^1.13.14",
+        "material-symbols": "^0.40.2",
         "vue": "^3.5.25",
         "vue-router": "^4.4.5",
         "vuedraggable": "^4.1.0"

@@ -1,44 +1,74 @@
-export interface ArtifactItem {
-    artifact_type: string; // "요구사항정의서" | "화면설계서" | "이외"
-    name: string;
+// --- 1. Database/Domain Entities (Reading) ---
+
+export interface ProjectArtifact {
+    id: number;
+    project_id: number;
+    artifact_type: string; // '요구사항정의서', '화면설계서' 등
+    name: string; // 사용자 정의 산출물 명
+    file_name: string | null;
+    extension: string | null; // .pdf, .docx
     has_file: boolean;
-    // 프론트엔드 전용 필드 (선택)
-    id?: number; // UI 목록 관리용 임시 ID
-    selected?: boolean; // UI 선택 상태
-    file?: File; // 업로드할 파일 객체
+    file_path: string | null;
+    created_at: string; // TIMESTAMPTZ -> string
 }
 
-export interface ExternalSystemItem {
-    system_type: "jira" | "figma";
-    url?: string;
+export interface ProjectExternalSystem {
+    id: number;
+    project_id: number;
+    system_type: string; // 'jira', 'figma'
+    url: string | null;
     enabled: boolean;
-    // pat는 보안상 서버로 전송할 때만 사용하거나 별도 관리,
-    // 일단 UI 상태 관리를 위해 여기 포함시킬지 고민되지만 Pydantic엔 제외됨.
-    // UI에서만 쓰는 필드로 추가
-    pat?: string;
-    label?: string; // UI 표시용
-    description?: string; // UI 표시용
-    status?: "idle" | "connected" | "error"; // UI 상태용
+    // pat는 보안상 DB 저장 안 함 -> Response에도 없음
+    created_at: string;
 }
 
 export interface ProjectBase {
     name: string;
+    service_type: string;
     description?: string;
 }
 
-export interface ProjectCreate extends ProjectBase {
-    artifacts: ArtifactItem[];
-    external_systems: ExternalSystemItem[];
+// --- 2. Creation / UI (Writing) ---
+
+export interface ArtifactCreate {
+    artifact_type: string;
+    name: string;
+    has_file: boolean;
+    // 프론트엔드 전용 필드 (파일 업로드 등)
+    id?: number; // UI only
+    file?: File; // UI only
+    selected?: boolean; // UI only
 }
 
+export interface ExternalSystemCreate {
+    system_type: "jira" | "figma";
+    url?: string;
+    enabled: boolean;
+    // UI Only or Transmitted securely
+    pat?: string;
+    label?: string; // UI Only
+    description?: string; // UI Only
+    status?: "idle" | "connected" | "error"; // UI Only
+}
+
+export interface ProjectCreate extends ProjectBase {
+    artifacts: ArtifactCreate[];
+    external_systems: ExternalSystemCreate[];
+}
+
+// --- 3. API Response ---
+
 export interface ProjectResponse extends ProjectBase {
-    id: string; // UUID
-    created_at: string; // datetime string
-    updated_at: string; // datetime string
-    artifacts: ArtifactItem[];
-    external_systems: ExternalSystemItem[];
+    id: number;
+    created_at: string;
+    updated_at: string;
+    artifacts: ProjectArtifact[];
+    external_systems: ProjectExternalSystem[];
     tc_count: number;
 }
 
-// ProjectBase의 모든 필드를 optional로 만듭니다.
 export type ProjectUpdate = Partial<ProjectBase>;
+
+// UI 호환성을 위한 Type Alias (기존 코드 호환)
+export type ArtifactItem = ArtifactCreate;
+export type ExternalSystemItem = ExternalSystemCreate;

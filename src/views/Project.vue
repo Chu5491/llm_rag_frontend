@@ -1,7 +1,50 @@
+<script setup lang="ts">
+import {ref, onMounted} from "vue";
+import {useRouter} from "vue-router";
+import {fetchProjects} from "../services/projectApi.js";
+import type {ProjectResponse} from "../types/project.js";
+
+const router = useRouter();
+
+// 프로젝트 목록 상태
+const projects = ref<ProjectResponse[]>([]);
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+
+// 데이터 로드
+const loadProjects = async () => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+        projects.value = await fetchProjects();
+    } catch (e: any) {
+        console.error("프로젝트 로드 실패:", e);
+        error.value = "프로젝트 목록을 불러오는 데 실패했습니다.";
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+// 숫자 포맷팅 (천 단위 콤마)
+const formatNumber = (num: number) => {
+    return new Intl.NumberFormat().format(num);
+};
+
+// 상세 페이지 이동
+const navigateToProject = (id: number) => {
+    router.push(`/project/detail/${id}`);
+};
+
+// 초기 로드
+onMounted(() => {
+    loadProjects();
+});
+</script>
+
 <template>
     <!-- 대시보드 메인 래퍼 -->
     <main class="p-6 space-y-6">
-        <!-- 페이지 헤더 (기존과 동일) -->
+        <!-- 페이지 헤더 -->
         <header class="flex items-center justify-between">
             <div>
                 <p class="mt-1 text-sm text-gray-500">
@@ -17,85 +60,99 @@
         </header>
 
         <!-- 메인 카드 -->
-        <section class="rounded-lg bg-white p-6 shadow space-y-6">
-            <div class="overflow-x-auto rounded-lg border border-gray-100 bg-white">
+        <section class="rounded-lg bg-white p-6 shadow space-y-6 min-h-[400px]">
+            <!-- 로딩 상태 -->
+            <div
+                v-if="isLoading"
+                class="flex flex-col items-center justify-center py-20"
+            >
+                <div
+                    class="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"
+                ></div>
+                <p class="mt-4 text-sm text-gray-500">
+                    프로젝트 목록을 불러오는 중입니다...
+                </p>
+            </div>
+
+            <!-- 에러 상태 -->
+            <div
+                v-else-if="error"
+                class="flex flex-col items-center justify-center py-20"
+            >
+                <span class="material-icons-outlined text-4xl text-red-400"
+                    >error_outline</span
+                >
+                <p class="mt-2 text-sm text-gray-500">{{ error }}</p>
+                <button
+                    @click="loadProjects"
+                    class="mt-4 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                    다시 시도
+                </button>
+            </div>
+
+            <!-- 데이터 없음 -->
+            <div
+                v-else-if="projects.length === 0"
+                class="flex flex-col items-center justify-center py-20"
+            >
+                <span class="material-icons-outlined text-4xl text-gray-300"
+                    >folder_off</span
+                >
+                <p class="mt-2 text-sm text-gray-500">
+                    등록된 프로젝트가 없습니다.
+                </p>
+            </div>
+
+            <!-- 테이블 (데이터 있음) -->
+            <div
+                v-else
+                class="overflow-x-auto rounded-lg border border-gray-100 bg-white"
+            >
                 <table class="table-container">
                     <thead class="table-header">
                         <tr>
-                            <th class="w-10 table-header-cell"></th>
-                            <th class="w-32 table-header-cell">프로젝트명</th>
+                            <th class="w-10 table-header-cell">ID</th>
+                            <th class="w-48 table-header-cell">프로젝트명</th>
+                            <th class="table-header-cell">서비스 유형</th>
                             <th class="table-header-cell">설명</th>
-                            <th class="w-32 table-header-cell">
+                            <th class="w-32 table-header-cell text-center">
                                 생성 TC 건 수
                             </th>
-                            <th class="table-header-cell"></th>
                         </tr>
                     </thead>
                     <tbody class="table-body">
-                        <!-- 행 1 -->
                         <tr
-                            class="table-row cursor-pointer"
-                            @click="$router.push('/project/detail/1')"
+                            v-for="project in projects"
+                            :key="project.id"
+                            class="table-row cursor-pointer hover:bg-gray-50 transition-colors"
+                            @click="navigateToProject(project.id)"
                         >
-                            <td class="table-cell text-center">1</td>
+                            <td class="table-cell text-center text-gray-500">
+                                {{ project.id }}
+                            </td>
                             <td class="table-cell">
                                 <code class="text-xs font-mono text-indigo-600">
-                                    SK Agent Bench
+                                    {{ project.name }}
                                 </code>
                             </td>
-                            <td class="table-cell text-gray-700">
-                                로그인 성공 시 대시보드 진입 확인
-                            </td>
                             <td class="table-cell">
-                                <span class="badge badge-red">
-                                    582
+                                <span
+                                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
+                                >
+                                    {{ project.service_type }}
                                 </span>
                             </td>
-                            <td class="table-cell">X</td>
-                        </tr>
-
-                        <!-- 행 2 -->
-                        <tr
-                            class="table-row cursor-pointer"
-                            @click="$router.push('/project/detail/2')"
-                        >
-                            <td class="table-cell text-center">2</td>
-                            <td class="table-cell">
-                                <code class="text-xs font-mono text-indigo-600">
-                                    Samsung VOC
-                                </code>
+                            <td
+                                class="table-cell text-gray-700 truncate max-w-xs"
+                            >
+                                {{ project.description }}
                             </td>
-                            <td class="table-cell text-gray-700">
-                                잘못된 비밀번호 입력 시 오류 메시지 표시
-                            </td>
-                            <td class="table-cell">
-                                <span class="badge badge-yellow">
-                                    250
-                                </span>
-                            </td>
-                            <td class="table-cell">X</td>
-                        </tr>
-
-                        <!-- 행 3 -->
-                        <tr
-                            class="table-row cursor-pointer"
-                            @click="$router.push('/project/detail/3')"
-                        >
-                            <td class="table-cell text-center">3</td>
-                            <td class="table-cell">
-                                <code class="text-xs font-mono text-indigo-600">
-                                    T-Gen
-                                </code>
-                            </td>
-                            <td class="table-cell text-gray-700">
-                                로그인 페이지에서 비밀번호 보기 토글 동작 확인
-                            </td>
-                            <td class="table-cell">
+                            <td class="table-cell text-center">
                                 <span class="badge badge-green">
-                                    120
+                                    {{ formatNumber(project.tc_count) }}
                                 </span>
                             </td>
-                            <td class="table-cell">X</td>
                         </tr>
                     </tbody>
                 </table>
@@ -103,14 +160,3 @@
         </section>
     </main>
 </template>
-
-<script setup lang="ts">
-import {useRouter} from "vue-router";
-
-const router = useRouter();
-
-// 필요시 라우터를 사용한 프로그래밍 방식의 네비게이션을 위해
-const navigateToProject = (id: number) => {
-    router.push(`/project/detail/${id}`);
-};
-</script>

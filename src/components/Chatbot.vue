@@ -1,3 +1,84 @@
+<script setup lang="ts">
+import {ref, nextTick} from "vue";
+import {sendChatMessage} from "../services/api.js";
+import {marked} from "marked";
+
+interface Message {
+    text: string;
+    sender: "user" | "bot";
+}
+
+const isOpen = ref(false);
+const chatContainerRef = ref<HTMLElement | null>(null);
+const newMessage = ref("");
+const isLoading = ref(false);
+const messages = ref<Message[]>([
+    {text: "안녕하세요! 무엇을 도와드릴까요?", sender: "bot"},
+]);
+
+// 마크다운을 HTML로 변환
+const renderMarkdown = (content: string): string => {
+    return marked(content, {
+        breaks: true,
+        gfm: true,
+    }) as string;
+};
+
+const toggleChat = () => {
+    isOpen.value = !isOpen.value;
+    if (isOpen.value) {
+        scrollToBottom();
+    }
+};
+
+const scrollToBottom = async () => {
+    await nextTick();
+    if (chatContainerRef.value) {
+        chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight;
+    }
+};
+
+const sendMessage = async () => {
+    const userMessage = newMessage.value.trim();
+    if (!userMessage || isLoading.value) return;
+
+    // 사용자 메시지 추가
+    messages.value.push({
+        text: userMessage,
+        sender: "user",
+    });
+
+    // 입력 필드 초기화
+    newMessage.value = "";
+
+    // 로딩 상태 표시
+    isLoading.value = true;
+    scrollToBottom();
+
+    try {
+        // API 서비스를 사용하여 메시지 전송
+        const response = await sendChatMessage([
+            {role: "user", content: userMessage},
+        ]);
+
+        // 성공적인 응답 처리
+        messages.value.push({
+            text: response.raw.message.content,
+            sender: "bot",
+        });
+    } catch (error) {
+        console.error("채팅 오류:", error);
+        messages.value.push({
+            text: "채팅을 처리하는 중 오류가 발생했습니다. 나중에 다시 시도해주세요.",
+            sender: "bot",
+        });
+    } finally {
+        isLoading.value = false;
+        scrollToBottom();
+    }
+};
+</script>
+
 <template>
     <div class="fixed bottom-4 right-6 z-50 flex flex-col items-end space-y-3">
         <!-- 챗봇 창 -->
@@ -124,87 +205,6 @@
         </button>
     </div>
 </template>
-
-<script setup lang="ts">
-import {ref, nextTick} from "vue";
-import {sendChatMessage} from "../services/api.js";
-import {marked} from "marked";
-
-interface Message {
-    text: string;
-    sender: "user" | "bot";
-}
-
-const isOpen = ref(false);
-const chatContainerRef = ref<HTMLElement | null>(null);
-const newMessage = ref("");
-const isLoading = ref(false);
-const messages = ref<Message[]>([
-    {text: "안녕하세요! 무엇을 도와드릴까요?", sender: "bot"},
-]);
-
-// 마크다운을 HTML로 변환
-const renderMarkdown = (content: string): string => {
-    return marked(content, {
-        breaks: true,
-        gfm: true,
-    }) as string;
-};
-
-const toggleChat = () => {
-    isOpen.value = !isOpen.value;
-    if (isOpen.value) {
-        scrollToBottom();
-    }
-};
-
-const scrollToBottom = async () => {
-    await nextTick();
-    if (chatContainerRef.value) {
-        chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight;
-    }
-};
-
-const sendMessage = async () => {
-    const userMessage = newMessage.value.trim();
-    if (!userMessage || isLoading.value) return;
-
-    // 사용자 메시지 추가
-    messages.value.push({
-        text: userMessage,
-        sender: "user",
-    });
-
-    // 입력 필드 초기화
-    newMessage.value = "";
-
-    // 로딩 상태 표시
-    isLoading.value = true;
-    scrollToBottom();
-
-    try {
-        // API 서비스를 사용하여 메시지 전송
-        const response = await sendChatMessage([
-            {role: "user", content: userMessage},
-        ]);
-
-        // 성공적인 응답 처리
-        messages.value.push({
-            text: response.raw.message.content,
-            sender: "bot",
-        });
-    } catch (error) {
-        console.error("채팅 오류:", error);
-        messages.value.push({
-            text: "채팅을 처리하는 중 오류가 발생했습니다. 나중에 다시 시도해주세요.",
-            sender: "bot",
-        });
-    } finally {
-        isLoading.value = false;
-        scrollToBottom();
-    }
-};
-</script>
 
 <style scoped>
 /* 애니메이션을 위한 스타일 */

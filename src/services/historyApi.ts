@@ -20,8 +20,20 @@ export async function generateTestCases(
 }
 
 // Figma 연동 정보 및 현재 상태 확인
-export async function checkFigmaPersist(): Promise<any> {
-    const res = await fetch("/api/v1/figma/info");
+export async function checkFigmaPersist(
+    url?: string,
+    pat?: string
+): Promise<any> {
+    const res = await fetch("/api/v1/figma/info", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            url,
+            pat,
+        }),
+    });
 
     if (!res.ok) {
         let message = "Figma 연동 체크에 실패했습니다.";

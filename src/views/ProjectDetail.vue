@@ -1,3 +1,91 @@
+<script setup lang="ts">
+import {ref, onMounted} from "vue";
+import {useRoute, useRouter} from "vue-router";
+import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
+import {fetchProjectDetail} from "../services/projectApi.js";
+import type {ProjectResponse} from "../types/project.js";
+
+const route = useRoute();
+const router = useRouter();
+
+const project = ref<ProjectResponse | null>(null);
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+
+// 프로젝트 상세 로드
+const loadProjectDetail = async () => {
+    const projectId = Number(route.params.id);
+    if (!projectId) {
+        error.value = "유효하지 않은 프로젝트 ID입니다.";
+        return;
+    }
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+        project.value = await fetchProjectDetail(projectId);
+    } catch (e: any) {
+        console.error("프로젝트 상세 로드 실패:", e);
+        error.value = "프로젝트 정보를 불러오는 데 실패했습니다.";
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+// 외부 시스템 아이콘 매핑
+const getSystemIcon = (systemType: string) => {
+    const icons: Record<string, string> = {
+        jira: "J",
+        figma: "F",
+        github: "G",
+        slack: "S",
+    };
+    return icons[systemType] || "•";
+};
+
+// 날짜 포맷팅
+const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+    };
+    return new Date(dateString).toLocaleDateString("ko-KR", options);
+};
+
+// 5가지 고정 카테고리 (HTML 템플릿 기준)
+const ARTIFACT_CATEGORIES = [
+    "요구사항명세서",
+    "화면설계서",
+    "API 명세서",
+    "메뉴얼",
+    "기타 자료",
+] as const;
+
+const categoryIcons: Record<string, string> = {
+    요구사항명세서: "assignment",
+    화면설계서: "web_asset",
+    "API 명세서": "api",
+    메뉴얼: "menu_book",
+    "기타 자료": "folder_open",
+};
+
+// ... existing code ...
+
+// 뒤로 가기
+const goBack = () => {
+    router.go(-1);
+};
+
+onMounted(() => {
+    loadProjectDetail();
+});
+</script>
+
 <template>
     <main class="p-6 space-y-6">
         <!-- Header Section -->
@@ -15,10 +103,46 @@
             </button>
         </header>
 
+        <!-- Loading State -->
+        <div
+            v-if="isLoading"
+            class="flex flex-col items-center justify-center py-20 bg-white rounded-lg shadow"
+        >
+            <div
+                class="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"
+            ></div>
+            <p class="mt-4 text-sm text-gray-500">
+                프로젝트 정보를 불러오는 중입니다...
+            </p>
+        </div>
+
+        <!-- Error State -->
+        <div
+            v-else-if="error"
+            class="flex flex-col items-center justify-center py-20 bg-white rounded-lg shadow"
+        >
+            <span class="material-icons-outlined text-4xl text-red-400"
+                >error_outline</span
+            >
+            <p class="mt-2 text-sm text-gray-500">{{ error }}</p>
+            <button
+                @click="loadProjectDetail"
+                class="mt-4 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+                다시 시도
+            </button>
+        </div>
+
         <!-- Main Content -->
-        <section class="rounded-lg bg-white p-6 shadow space-y-8">
-            <!-- Basic Info Section -->
+        <section
+            v-else-if="project"
+            class="rounded-lg bg-white p-6 shadow space-y-8"
+        >
+            <!-- 1. Basic Info Section -->
             <div>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                    1. 프로젝트 기본 정보
+                </h3>
                 <div class="bg-gray-50 p-5 rounded-lg border border-gray-100">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-4">
@@ -36,10 +160,20 @@
                                 <p
                                     class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
                                 >
+                                    서비스 유형
+                                </p>
+                                <p class="text-base text-gray-900">
+                                    {{ project.service_type || "-" }}
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+                                >
                                     생성 일자
                                 </p>
                                 <p class="text-base text-gray-900">
-                                    {{ formatDate(project.createdAt) }}
+                                    {{ formatDate(project.created_at) }}
                                 </p>
                             </div>
                         </div>
@@ -59,99 +193,151 @@
                 </div>
             </div>
 
-            <!-- Artifacts Section -->
+            <!-- 2. Artifacts Section -->
             <div>
-                <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    등록된 산출물
-                </h3>
-                <div
-                    class="overflow-hidden rounded-lg border border-gray-200 shadow-sm"
-                >
-                    <table class="table-container">
-                        <thead class="table-header">
-                            <tr>
-                                <th class="table-header-cell">유형</th>
-                                <th class="table-header-cell">파일명</th>
-                                <th class="table-header-cell text-center">
-                                    데이터 분석
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="table-body">
-                            <tr
-                                v-for="artifact in project.artifacts"
-                                :key="artifact.id"
-                                class="table-row"
-                            >
-                                <td
-                                    class="table-cell font-medium text-gray-900"
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        2. 등록된 산출물
+                    </h3>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div
+                        v-for="category in ARTIFACT_CATEGORIES"
+                        :key="category"
+                        class="flex flex-col rounded-lg border border-gray-200 bg-white"
+                        :class="{'lg:col-span-2': category === '기타 자료'}"
+                    >
+                        <!-- Header -->
+                        <div
+                            class="px-4 py-2.5 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg"
+                        >
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="material-icons-outlined text-gray-400 text-[18px]"
+                                    >{{ categoryIcons[category] }}</span
                                 >
-                                    {{ artifact.type }}
-                                </td>
-                                <td class="table-cell text-gray-500">
-                                    {{ artifact.name }}
-                                </td>
-                                <td class="table-cell text-center">
-                                    <span
-                                        :class="{
-                                            'bg-green-100 text-green-800':
-                                                artifact.status === '완료',
-                                            'bg-yellow-100 text-yellow-800':
-                                                artifact.status === '부분 완료',
-                                            'bg-red-100 text-red-800':
-                                                artifact.status === '실패',
-                                        }"
-                                        class="px-2.5 py-0.5 text-xs font-medium rounded-full"
+                                <span class="text-sm font-bold text-gray-700">{{
+                                    category
+                                }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-3 space-y-2 flex-1">
+                            <div
+                                v-if="
+                                    project.artifacts.filter(
+                                        (a) => a.artifact_type === category
+                                    ).length > 0
+                                "
+                                class="space-y-2"
+                            >
+                                <div
+                                    v-for="artifact in project.artifacts.filter(
+                                        (a) => a.artifact_type === category
+                                    )"
+                                    :key="artifact.id"
+                                    class="flex items-center gap-2 bg-white p-2 rounded border border-gray-200 shadow-sm"
+                                >
+                                    <div
+                                        class="flex-1 min-w-0 flex items-center gap-2"
                                     >
-                                        {{ artifact.status }}
+                                        <span
+                                            class="material-icons-outlined text-sm"
+                                            :class="
+                                                getFileIconColor(artifact.name)
+                                            "
+                                        >
+                                            {{ getFileIcon(artifact.name) }}
+                                        </span>
+                                        <div class="flex flex-col min-w-0">
+                                            <span
+                                                class="text-xs text-gray-900 truncate font-medium"
+                                            >
+                                                {{ artifact.name }}
+                                            </span>
+                                            <span
+                                                v-if="artifact.file_name"
+                                                class="text-[10px] text-gray-400 truncate"
+                                            >
+                                                {{ artifact.file_name }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Status Badge -->
+                                    <span
+                                        v-if="artifact.has_file"
+                                        class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-100"
+                                    >
+                                        등록됨
                                     </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                    <span
+                                        v-else
+                                        class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-100"
+                                    >
+                                        미등록
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Empty State -->
+                            <div v-else class="text-center py-4">
+                                <span class="text-xs text-gray-400 italic"
+                                    >등록된 파일이 없습니다.</span
+                                >
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- External Systems Section -->
-            <div v-if="project.externalSystems.length > 0">
+            <!-- 3. External Systems Section -->
+            <div v-if="project.external_systems.length > 0">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    외부 시스템 데이터 분석
+                    3. 외부 시스템 데이터 분석
                 </h3>
                 <div
                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                 >
                     <div
-                        v-for="system in project.externalSystems"
+                        v-for="system in project.external_systems"
                         :key="system.id"
-                        class="flex items-center p-4 rounded-lg border border-gray-200 hover:border-indigo-500 bg-white shadow-sm transition-all cursor-default"
+                        class="flex items-center p-4 rounded-lg border border-gray-200 bg-white shadow-sm transition-all cursor-default"
+                        :class="
+                            system.enabled
+                                ? 'border-indigo-200 ring-1 ring-indigo-100'
+                                : 'border-gray-200 opacity-70'
+                        "
                     >
                         <div
                             :class="{
                                 'bg-blue-50 text-blue-700':
-                                    system.id === 'Jira',
+                                    system.system_type === 'jira',
                                 'bg-purple-50 text-purple-700':
-                                    system.id === 'Figma',
+                                    system.system_type === 'figma',
                             }"
                             class="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg"
                         >
-                            {{ getSystemIcon(system.id) }}
+                            {{ getSystemIcon(system.system_type) }}
                         </div>
                         <div class="ml-4">
                             <p class="text-base font-semibold text-gray-900">
-                                {{ system.name }}
+                                {{ system.system_type.toUpperCase() }}
                             </p>
                             <div class="flex items-center mt-1">
                                 <span
                                     class="h-2 w-2 rounded-full mr-2"
                                     :class="
-                                        system.status === 'connected'
+                                        system.enabled
                                             ? 'bg-green-500'
-                                            : 'bg-red-500'
+                                            : 'bg-gray-400'
                                     "
                                 ></span>
                                 <p class="text-xs text-gray-500">
                                     {{
-                                        system.status === "connected"
+                                        system.enabled
                                             ? "분석 완료"
                                             : "사용 안함"
                                     }}
@@ -164,68 +350,3 @@
         </section>
     </main>
 </template>
-
-<script setup lang="ts">
-import {ref, onMounted} from "vue";
-import {useRoute, useRouter} from "vue-router";
-
-const route = useRoute();
-const router = useRouter();
-
-// 프로젝트 데이터 (실제로는 API에서 가져옴)
-const project = ref({
-    id: route.params.id as string,
-    name: "새로운 프로젝트",
-    description:
-        "이 프로젝트는 테스트를 위한 프로젝트입니다.\n여러 줄로 된 설명을 확인할 수 있습니다.",
-    createdAt: new Date().toISOString(),
-    artifacts: [
-        {
-            id: 1,
-            type: "요구사항정의서",
-            name: "요구사항정의서_v1.0.pdf",
-            status: "완료",
-        },
-        {
-            id: 2,
-            type: "화면설계서",
-            name: "화면설계서_v1.0.pdf",
-            status: "부분 완료",
-        },
-        {id: 3, type: "API 문서", name: "API_문서_v1.0.pdf", status: "실패"},
-    ],
-    externalSystems: [
-        {id: "Figma", name: "Figma", status: "connected"},
-        {id: "Jira", name: "Jira", status: "disconnected"},
-    ],
-});
-
-// 외부 시스템 아이콘 매핑
-const getSystemIcon = (systemId: string) => {
-    const icons: Record<string, string> = {
-        Jira: "J",
-        Figma: "F",
-        Github: "G",
-        Slack: "S",
-    };
-    return icons[systemId] || "•";
-};
-
-// 날짜 포맷팅
-const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-    };
-    return new Date(dateString).toLocaleDateString("ko-KR", options);
-};
-
-// 뒤로 가기
-const goBack = () => {
-    router.go(-1);
-};
-</script>
