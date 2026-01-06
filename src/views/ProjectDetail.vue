@@ -57,28 +57,70 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR", options);
 };
 
-// 5가지 고정 카테고리 (HTML 템플릿 기준)
-const ARTIFACT_CATEGORIES = [
-    "요구사항명세서",
-    "화면설계서",
-    "API 명세서",
-    "메뉴얼",
-    "기타 자료",
-] as const;
+import {
+    ARTIFACT_TYPES,
+    ARTIFACT_LABELS,
+    ARTIFACT_ICONS,
+    type ArtifactType,
+} from "../types/project.js";
 
-const categoryIcons: Record<string, string> = {
-    요구사항명세서: "assignment",
-    화면설계서: "web_asset",
-    "API 명세서": "api",
-    메뉴얼: "menu_book",
-    "기타 자료": "folder_open",
-};
+// 카테고리 순서 정의 (화면 표시 순서)
+const ORDERED_CATEGORIES: ArtifactType[] = [
+    ARTIFACT_TYPES.REQUIREMENTS,
+    ARTIFACT_TYPES.SCREEN_DESIGN,
+    ARTIFACT_TYPES.API_SPEC,
+    ARTIFACT_TYPES.MANUAL,
+    ARTIFACT_TYPES.ETC,
+];
 
 // ... existing code ...
 
 // 뒤로 가기
 const goBack = () => {
     router.go(-1);
+};
+
+// 상태별 UI 매핑 (Artifact & External System 공통)
+const getStatusBadge = (status: string | undefined) => {
+    switch (status) {
+        case "processing":
+            return {
+                text: "진행중",
+                classes: "bg-blue-50 text-blue-700 border border-blue-100",
+                dotClass: "bg-blue-500", // for system dot
+                icon: "hourglass_empty", // optional
+            };
+        case "completed":
+            return {
+                text: "분석 완료",
+                classes: "bg-green-50 text-green-700 border border-green-100",
+                dotClass: "bg-green-500",
+                icon: "check_circle",
+            };
+        case "partial_success":
+            return {
+                text: "일부 완료",
+                classes:
+                    "bg-orange-50 text-orange-700 border border-orange-100",
+                dotClass: "bg-orange-500",
+                icon: "warning",
+            };
+        case "error":
+            return {
+                text: "실패",
+                classes: "bg-red-50 text-red-700 border border-red-100",
+                dotClass: "bg-red-500",
+                icon: "error",
+            };
+        case "idle":
+        default:
+            return {
+                text: "대기",
+                classes: "bg-gray-50 text-gray-500 border border-gray-100",
+                dotClass: "bg-gray-400",
+                icon: "schedule",
+            };
+    }
 };
 
 onMounted(() => {
@@ -203,10 +245,12 @@ onMounted(() => {
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div
-                        v-for="category in ARTIFACT_CATEGORIES"
+                        v-for="category in ORDERED_CATEGORIES"
                         :key="category"
                         class="flex flex-col rounded-lg border border-gray-200 bg-white"
-                        :class="{'lg:col-span-2': category === '기타 자료'}"
+                        :class="{
+                            'lg:col-span-2': category === ARTIFACT_TYPES.ETC,
+                        }"
                     >
                         <!-- Header -->
                         <div
@@ -215,10 +259,10 @@ onMounted(() => {
                             <div class="flex items-center gap-2">
                                 <span
                                     class="material-icons-outlined text-gray-400 text-[18px]"
-                                    >{{ categoryIcons[category] }}</span
+                                    >{{ ARTIFACT_ICONS[category] }}</span
                                 >
                                 <span class="text-sm font-bold text-gray-700">{{
-                                    category
+                                    ARTIFACT_LABELS[category]
                                 }}</span>
                             </div>
                         </div>
@@ -267,12 +311,43 @@ onMounted(() => {
                                     </div>
 
                                     <!-- Status Badge -->
-                                    <span
-                                        v-if="artifact.has_file"
-                                        class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-100"
-                                    >
-                                        등록됨
-                                    </span>
+                                    <template v-if="artifact.has_file">
+                                        <!-- Error with Tooltip -->
+                                        <div
+                                            v-if="artifact.status === 'error'"
+                                            class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border relative group cursor-help"
+                                            :class="
+                                                getStatusBadge(artifact.status)
+                                                    .classes
+                                            "
+                                        >
+                                            {{
+                                                getStatusBadge(artifact.status)
+                                                    .text
+                                            }}
+                                            <span
+                                                v-if="artifact.last_error"
+                                                class="hidden group-hover:block absolute bottom-full right-0 mb-1 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50 whitespace-normal wrap-break-word text-left"
+                                            >
+                                                {{ artifact.last_error }}
+                                            </span>
+                                        </div>
+
+                                        <!-- Other Statuses -->
+                                        <span
+                                            v-else
+                                            class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border"
+                                            :class="
+                                                getStatusBadge(artifact.status)
+                                                    .classes
+                                            "
+                                        >
+                                            {{
+                                                getStatusBadge(artifact.status)
+                                                    .text
+                                            }}
+                                        </span>
+                                    </template>
                                     <span
                                         v-else
                                         class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-100"
@@ -326,21 +401,38 @@ onMounted(() => {
                             <p class="text-base font-semibold text-gray-900">
                                 {{ system.system_type.toUpperCase() }}
                             </p>
-                            <div class="flex items-center mt-1">
-                                <span
-                                    class="h-2 w-2 rounded-full mr-2"
-                                    :class="
-                                        system.enabled
-                                            ? 'bg-green-500'
-                                            : 'bg-gray-400'
+                            <div class="flex flex-col mt-1">
+                                <div class="flex items-center">
+                                    <span
+                                        class="h-2 w-2 rounded-full mr-2"
+                                        :class="
+                                            system.enabled
+                                                ? getStatusBadge(system.status)
+                                                      .dotClass
+                                                : 'bg-gray-300'
+                                        "
+                                    ></span>
+                                    <p class="text-xs text-gray-500">
+                                        <span v-if="!system.enabled"
+                                            >사용 안함</span
+                                        >
+                                        <span v-else>
+                                            {{
+                                                getStatusBadge(system.status)
+                                                    .text
+                                            }}
+                                        </span>
+                                    </p>
+                                </div>
+                                <!-- Error Message -->
+                                <p
+                                    v-if="
+                                        system.status === 'error' &&
+                                        system.last_error
                                     "
-                                ></span>
-                                <p class="text-xs text-gray-500">
-                                    {{
-                                        system.enabled
-                                            ? "분석 완료"
-                                            : "사용 안함"
-                                    }}
+                                    class="text-[10px] text-red-500 mt-1 break-all"
+                                >
+                                    {{ system.last_error }}
                                 </p>
                             </div>
                         </div>

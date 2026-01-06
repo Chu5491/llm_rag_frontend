@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
 import {getOllamaModels, startGeneration} from "../services/api.js";
+import {fetchProjects} from "../services/projectApi.js"; // Import added
 import type {OllamaModel} from "../types/ollama.js";
+import type {ProjectResponse} from "../types/project.js"; // Import added
 import router from "../router/index.js";
 
 // 폼 상태 (지금은 목업용 기본값)
@@ -19,8 +21,29 @@ const selectedLanguage = ref("한글");
 
 const tcPrefix = ref("SAB");
 
-// Ollama 모델 목록 가져오기
+// 프로젝트 목록 상태
+const projects = ref<ProjectResponse[]>([]);
+const projectsLoading = ref(false);
+const selectedProjectId = ref<number | null>(null);
+
+// 초기 데이터 로드 (Projects + Ollama Models)
 onMounted(async () => {
+    // 1. 프로젝트 목록 로드
+    projectsLoading.value = true;
+    try {
+        const projectData = await fetchProjects();
+        projects.value = projectData;
+        if (projects.value.length > 0) {
+            selectedProjectId.value = projects.value[0].id;
+            selectedProject.value = projects.value[0].name; // UI 호환용 (Legacy)
+        }
+    } catch (e) {
+        console.error("Failed to fetch projects", e);
+    } finally {
+        projectsLoading.value = false;
+    }
+
+    // 2. Ollama 모델 목록 로드
     modelsLoading.value = true;
     modelsError.value = null;
 
@@ -68,7 +91,7 @@ const handleSubmit = () => {
     generationStatus.value = "generating";
 
     startGeneration({
-        project_id: 1,
+        project_id: selectedProjectId.value ?? 1, // 선택된 ID 사용
         title: title.value,
         model: selectedModel.value,
         language: selectedLanguage.value,
@@ -160,12 +183,25 @@ const handleSubmit = () => {
                             </label>
                             <select
                                 id="project"
-                                v-model="selectedProject"
+                                v-model="selectedProjectId"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             >
-                                <option>SKT Agent Bench</option>
-                                <option>T-Gen</option>
-                                <option>Samsung VOC</option>
+                                <option v-if="projectsLoading" :value="null">
+                                    로딩 중...
+                                </option>
+                                <option
+                                    v-else-if="projects.length === 0"
+                                    :value="null"
+                                >
+                                    프로젝트 없음
+                                </option>
+                                <option
+                                    v-for="proj in projects"
+                                    :key="proj.id"
+                                    :value="proj.id"
+                                >
+                                    {{ proj.name }}
+                                </option>
                             </select>
                         </div>
 
@@ -182,6 +218,7 @@ const handleSubmit = () => {
                                 v-model="selectedArtifact"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             >
+                                <option>전체</option>
                                 <option>화면설계서</option>
                                 <option>API 명세서</option>
                                 <option>요구사항 정의서</option>

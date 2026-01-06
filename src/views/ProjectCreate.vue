@@ -3,13 +3,17 @@ import {ref, computed, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
 import {checkFigmaPersist, createProject} from "../services/api.js";
 
-import type {
+import {
     ArtifactItem,
     ExternalSystemItem,
     ProjectBase,
     ProjectCreate,
     ArtifactCreate,
     ExternalSystemCreate,
+    ArtifactType,
+    ARTIFACT_TYPES,
+    ARTIFACT_LABELS,
+    ARTIFACT_ICONS,
 } from "../types/project.js";
 import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
 
@@ -24,7 +28,6 @@ let saveTimer: number | undefined;
 let redirectTimer: number | undefined;
 
 // 1. 프로젝트 기본 정보
-// 1. 프로젝트 기본 정보
 const projectBase = ref<ProjectBase>({
     name: "",
     service_type: "",
@@ -33,23 +36,14 @@ const projectBase = ref<ProjectBase>({
 
 // 추가 필드 (UI 전용, 백엔드 미지원 시 임시 상태)
 
-// 5가지 고정 카테고리
-// 5가지 고정 카테고리 (HTML 템플릿 기준)
-const ARTIFACT_CATEGORIES = [
-    "요구사항명세서",
-    "화면설계서",
-    "API 명세서",
-    "메뉴얼",
-    "기타 자료",
-] as const;
-
-const categoryIcons: Record<string, string> = {
-    요구사항명세서: "assignment",
-    화면설계서: "web_asset",
-    "API 명세서": "api",
-    메뉴얼: "menu_book",
-    "기타 자료": "folder_open",
-};
+// 카테고리 순서 정의 (화면 표시 순서)
+const ORDERED_CATEGORIES: ArtifactType[] = [
+    ARTIFACT_TYPES.REQUIREMENTS,
+    ARTIFACT_TYPES.SCREEN_DESIGN,
+    ARTIFACT_TYPES.API_SPEC,
+    ARTIFACT_TYPES.MANUAL,
+    ARTIFACT_TYPES.ETC,
+];
 
 // 산출물 목록 (ArtifactItem 확장)
 const artifacts = ref<ArtifactItem[]>([]);
@@ -63,9 +57,9 @@ const removeArtifactRow = (id?: number) => {
 
 // 파일 선택 처리
 const fileInput = ref<HTMLInputElement | null>(null);
-const targetCategory = ref<string | null>(null);
+const targetCategory = ref<ArtifactType | null>(null);
 
-const triggerFileInput = (category: string) => {
+const triggerFileInput = (category: ArtifactType) => {
     if (!fileInput.value) return;
     targetCategory.value = category;
     fileInput.value.value = ""; // 초기화
@@ -209,6 +203,7 @@ const handleSubmit = async () => {
             external_systems: externalSystems.value.map((e) => ({
                 system_type: e.system_type,
                 url: e.url,
+                pat: e.pat,
                 enabled: e.enabled,
             })),
         };
@@ -344,10 +339,13 @@ const formatFileSize = (bytes: number) => {
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div
-                            v-for="category in ARTIFACT_CATEGORIES"
+                            v-for="category in ORDERED_CATEGORIES"
                             :key="category"
                             class="flex flex-col rounded-lg border border-gray-200 bg-white"
-                            :class="{'lg:col-span-2': category === '기타 자료'}"
+                            :class="{
+                                'lg:col-span-2':
+                                    category === ARTIFACT_TYPES.ETC,
+                            }"
                         >
                             <div
                                 class="px-4 py-2.5 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg"
@@ -355,11 +353,11 @@ const formatFileSize = (bytes: number) => {
                                 <div class="flex items-center gap-2">
                                     <span
                                         class="material-icons-outlined text-gray-400 text-[18px]"
-                                        >{{ categoryIcons[category] }}</span
+                                        >{{ ARTIFACT_ICONS[category] }}</span
                                     >
                                     <span
                                         class="text-sm font-bold text-gray-700"
-                                        >{{ category }}</span
+                                        >{{ ARTIFACT_LABELS[category] }}</span
                                     >
                                 </div>
                                 <button
