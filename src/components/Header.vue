@@ -4,12 +4,11 @@ import {useRoute} from "vue-router";
 
 const route = useRoute();
 
-// 현재 라우트 이름을 기반으로 타이틀 표시
+// 현재 라우트 기반 타이틀 반환
 const pageTitle = computed(() => {
     const name = route.name as string;
     if (!name) return "Dashboard";
-    // "project-detail" -> "Project Detail" 변환 같은 로직이 필요할 수 있음
-    // 여기서는 단순히 name을 반환하거나 한글 매핑을 추가
+    // 라우트 이름 -> 한글 타이틀 매핑
     const titleMap: Record<string, string> = {
         Dashboard: "대시보드",
         Project: "프로젝트 관리",
@@ -20,12 +19,12 @@ const pageTitle = computed(() => {
         RagTest: "QA 테스트케이스 생성",
         GenerateCreate: "테스트케이스 자동생성 실행",
         GenerateHistory: "자동생성 히스토리",
-        test: "TC 생성 테스트"
+        test: "TC 생성 테스트",
     };
     return titleMap[name] || name;
 });
 
-// Icons are now provided by Heroicons
+// Heroicons 아이콘 사용
 </script>
 <template>
     <header
@@ -45,7 +44,9 @@ const pageTitle = computed(() => {
                 class="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors relative"
             >
                 <span class="sr-only">View notifications</span>
-                <span class="material-symbols-outlined text-xl">notifications_none</span>
+                <span class="material-symbols-outlined text-xl"
+                    >notifications_none</span
+                >
                 <span
                     class="absolute top-2 right-2 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
                 ></span>

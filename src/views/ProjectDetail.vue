@@ -57,6 +57,16 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR", options);
 };
 
+// 파일 크기 포맷팅
+const formatFileSize = (bytes: number | undefined) => {
+    if (bytes === undefined || bytes === null) return "";
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
 import {
     ARTIFACT_TYPES,
     ARTIFACT_LABELS,
@@ -64,7 +74,7 @@ import {
     type ArtifactType,
 } from "../types/project.js";
 
-// 카테고리 순서 정의 (화면 표시 순서)
+// 카테고리 표시 순서
 const ORDERED_CATEGORIES: ArtifactType[] = [
     ARTIFACT_TYPES.REQUIREMENTS,
     ARTIFACT_TYPES.SCREEN_DESIGN,
@@ -73,14 +83,12 @@ const ORDERED_CATEGORIES: ArtifactType[] = [
     ARTIFACT_TYPES.ETC,
 ];
 
-// ... existing code ...
-
 // 뒤로 가기
 const goBack = () => {
     router.go(-1);
 };
 
-// 상태별 UI 매핑 (Artifact & External System 공통)
+// 상태별 UI (배지/아이콘) 매핑
 const getStatusBadge = (status: string | undefined) => {
     switch (status) {
         case "processing":
@@ -130,22 +138,17 @@ onMounted(() => {
 
 <template>
     <main class="p-6 space-y-6">
-        <!-- Header Section -->
+        <!-- 헤더 -->
         <header class="flex justify-between items-start">
             <div>
                 <p class="mt-1 text-sm text-gray-500">
                     등록된 프로젝트의 상세 정보를 확인할 수 있습니다.
                 </p>
             </div>
-            <button
-                @click="goBack"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-            >
-                뒤로 가기
-            </button>
+            <button @click="goBack" class="btn-primary">뒤로 가기</button>
         </header>
 
-        <!-- Loading State -->
+        <!-- 로딩 상태 -->
         <div
             v-if="isLoading"
             class="flex flex-col items-center justify-center py-20 bg-white rounded-lg shadow"
@@ -158,7 +161,7 @@ onMounted(() => {
             </p>
         </div>
 
-        <!-- Error State -->
+        <!-- 에러 상태 -->
         <div
             v-else-if="error"
             class="flex flex-col items-center justify-center py-20 bg-white rounded-lg shadow"
@@ -175,70 +178,121 @@ onMounted(() => {
             </button>
         </div>
 
-        <!-- Main Content -->
+        <!-- 메인 컨텐츠 -->
         <section
             v-else-if="project"
             class="rounded-lg bg-white p-6 shadow space-y-8"
         >
-            <!-- 1. Basic Info Section -->
+            <!-- 1. 기본 정보 -->
             <div>
-                <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    1. 프로젝트 기본 정보
-                </h3>
-                <div class="bg-gray-50 p-5 rounded-lg border border-gray-100">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-4">
-                            <div>
-                                <p
-                                    class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+                <div
+                    class="flex items-center justify-between mb-5 pb-2 border-b border-gray-100"
+                >
+                    <h3 class="text-lg font-bold text-gray-900">
+                        1. 프로젝트 기본 정보
+                    </h3>
+                    <div
+                        class="flex items-center gap-3 text-xs text-gray-500 font-medium"
+                    >
+                        <span>생성: {{ formatDate(project.created_at) }}</span>
+                        <span class="w-px h-3 bg-gray-300"></span>
+                        <span>수정: {{ formatDate(project.updated_at) }}</span>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- 상단 정보 카드 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 프로젝트명 -->
+                        <div
+                            class="bg-gray-50 rounded-xl p-5 border border-gray-200 flex flex-col justify-center shadow-sm"
+                        >
+                            <div class="flex items-center gap-2 mb-2">
+                                <span
+                                    class="material-icons-outlined text-indigo-500 text-lg"
+                                    >inventory_2</span
                                 >
-                                    프로젝트 이름
-                                </p>
-                                <p class="text-base font-medium text-gray-900">
-                                    {{ project.name }}
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+                                <span
+                                    class="text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                                    >프로젝트 이름</span
                                 >
-                                    서비스 유형
-                                </p>
-                                <p class="text-base text-gray-900">
-                                    {{ project.service_type || "-" }}
-                                </p>
                             </div>
-                            <div>
-                                <p
-                                    class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-                                >
-                                    생성 일자
-                                </p>
-                                <p class="text-base text-gray-900">
-                                    {{ formatDate(project.created_at) }}
-                                </p>
-                            </div>
+                            <p class="text-lg font-bold text-gray-900 truncate">
+                                {{ project.name }}
+                            </p>
                         </div>
-                        <div>
-                            <p
-                                class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-                            >
-                                프로젝트 설명
+
+                        <!-- 서비스 유형 -->
+                        <div
+                            class="bg-gray-50 rounded-xl p-5 border border-gray-200 flex flex-col justify-center shadow-sm"
+                        >
+                            <div class="flex items-center gap-2 mb-2">
+                                <span
+                                    class="material-icons-outlined text-green-500 text-lg"
+                                    >devices</span
+                                >
+                                <span
+                                    class="text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                                    >서비스 유형</span
+                                >
+                            </div>
+                            <p class="text-lg font-bold text-gray-900">
+                                {{ project.service_type || "-" }}
                             </p>
-                            <p
-                                class="text-base text-gray-700 whitespace-pre-line leading-relaxed"
+                        </div>
+                    </div>
+
+                    <!-- 프로젝트 설명 -->
+                    <div
+                        class="bg-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm"
+                    >
+                        <div class="flex items-center gap-2 mb-3">
+                            <span
+                                class="material-icons-outlined text-gray-400 text-lg"
+                                >description</span
                             >
-                                {{ project.description }}
-                            </p>
+                            <span
+                                class="text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                                >프로젝트 설명</span
+                            >
+                        </div>
+                        <p
+                            class="text-sm text-gray-700 whitespace-pre-line leading-relaxed min-h-[60px]"
+                        >
+                            {{ project.description }}
+                        </p>
+                    </div>
+
+                    <!-- 주요 기능 태그 -->
+                    <div v-if="project.features && project.features.length > 0">
+                        <div class="flex items-center gap-2 mb-3 mt-6">
+                            <span
+                                class="material-icons-outlined text-gray-400 text-lg"
+                                >label</span
+                            >
+                            <span class="text-sm font-bold text-gray-900">
+                                주요 기능 목록
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <span
+                                v-for="feature in project.features"
+                                :key="feature.id"
+                                class="inline-flex items-center px-4 py-2 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"
+                            >
+                                {{ feature.name }}
+                            </span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. Artifacts Section -->
+            <!-- 2. 산출물 영역 -->
             <div>
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">
+                <div
+                    class="flex items-center justify-between mb-5 pb-2 border-b border-gray-100"
+                >
+                    <h3 class="text-lg font-bold text-gray-900">
                         2. 등록된 산출물
                     </h3>
                 </div>
@@ -252,7 +306,7 @@ onMounted(() => {
                             'lg:col-span-2': category === ARTIFACT_TYPES.ETC,
                         }"
                     >
-                        <!-- Header -->
+                        <!-- 헤더 -->
                         <div
                             class="px-4 py-2.5 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg"
                         >
@@ -267,7 +321,7 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- Content -->
+                        <!-- 컨텐츠 -->
                         <div class="p-3 space-y-2 flex-1">
                             <div
                                 v-if="
@@ -296,11 +350,28 @@ onMounted(() => {
                                             {{ getFileIcon(artifact.name) }}
                                         </span>
                                         <div class="flex flex-col min-w-0">
-                                            <span
-                                                class="text-xs text-gray-900 truncate font-medium"
+                                            <div
+                                                class="flex items-center gap-2"
                                             >
-                                                {{ artifact.name }}
-                                            </span>
+                                                <span
+                                                    class="text-xs text-gray-900 truncate font-medium"
+                                                >
+                                                    {{ artifact.name }}
+                                                </span>
+                                                <span
+                                                    v-if="
+                                                        artifact.file_size !==
+                                                        undefined
+                                                    "
+                                                    class="text-[10px] text-gray-400 shrink-0"
+                                                >
+                                                    {{
+                                                        formatFileSize(
+                                                            artifact.file_size
+                                                        )
+                                                    }}
+                                                </span>
+                                            </div>
                                             <span
                                                 v-if="artifact.file_name"
                                                 class="text-[10px] text-gray-400 truncate"
@@ -310,9 +381,9 @@ onMounted(() => {
                                         </div>
                                     </div>
 
-                                    <!-- Status Badge -->
+                                    <!-- 상태 배지 -->
                                     <template v-if="artifact.has_file">
-                                        <!-- Error with Tooltip -->
+                                        <!-- 에러 툴팁 -->
                                         <div
                                             v-if="artifact.status === 'error'"
                                             class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border relative group cursor-help"
@@ -333,7 +404,7 @@ onMounted(() => {
                                             </span>
                                         </div>
 
-                                        <!-- Other Statuses -->
+                                        <!-- 기타 상태 -->
                                         <span
                                             v-else
                                             class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border"
@@ -357,7 +428,7 @@ onMounted(() => {
                                 </div>
                             </div>
 
-                            <!-- Empty State -->
+                            <!-- 데이터 없음 -->
                             <div v-else class="text-center py-4">
                                 <span class="text-xs text-gray-400 italic"
                                     >등록된 파일이 없습니다.</span
@@ -368,11 +439,15 @@ onMounted(() => {
                 </div>
             </div>
 
-            <!-- 3. External Systems Section -->
+            <!-- 3. 외부 시스템 영역 -->
             <div v-if="project.external_systems.length > 0">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    3. 외부 시스템 데이터 분석
-                </h3>
+                <div
+                    class="flex items-center justify-between mb-5 pb-2 border-b border-gray-100"
+                >
+                    <h3 class="text-lg font-bold text-gray-900">
+                        3. 외부 시스템 데이터 분석
+                    </h3>
+                </div>
                 <div
                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                 >
@@ -424,7 +499,7 @@ onMounted(() => {
                                         </span>
                                     </p>
                                 </div>
-                                <!-- Error Message -->
+                                <!-- 에러 메시지 -->
                                 <p
                                     v-if="
                                         system.status === 'error' &&

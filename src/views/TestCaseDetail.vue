@@ -139,7 +139,7 @@ const handleSubmit = () => {
         <!-- 메인 카드 -->
         <section class="rounded-lg bg-white p-6 shadow">
             <form class="space-y-8" @submit.prevent="handleSubmit">
-                <!-- Top Row: TC ID & Priority -->
+                <!-- 상단: TC ID & 중요도 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <!-- TC ID -->
                     <div class="space-y-2">
@@ -251,7 +251,7 @@ const handleSubmit = () => {
                     </div>
                 </div>
 
-                <!-- Scenario (Draggable) -->
+                <!-- 시나리오 (드래그 지원) -->
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
                         <label class="text-lg font-bold text-gray-800">
@@ -316,7 +316,7 @@ const handleSubmit = () => {
                     </div>
                 </div>
 
-                <!-- Precondition & Expected Result -->
+                <!-- 선행조건 & 기대결과 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="space-y-2">
                         <label class="block text-sm font-bold text-gray-700">
@@ -348,7 +348,7 @@ const handleSubmit = () => {
                     </div>
                 </div>
 
-                <!-- Verification -->
+                <!-- 검증 여부 -->
                 <div class="pt-6 border-t border-gray-200">
                     <div class="flex items-start gap-12">
                         <label class="text-lg font-bold text-gray-800 mt-1">
@@ -395,7 +395,7 @@ const handleSubmit = () => {
                     </div>
                 </div>
 
-                <!-- Buttons -->
+                <!-- 저장/목록 버튼 -->
                 <div class="flex items-center justify-center gap-4 pt-6">
                     <button
                         type="button"
@@ -414,9 +414,9 @@ const handleSubmit = () => {
             </form>
         </section>
 
-        <!-- Review & History Tabs -->
+        <!-- 리뷰 & 히스토리 탭 -->
         <section class="rounded-lg bg-white shadow">
-            <!-- Tab Headers -->
+            <!-- 탭 헤더 -->
             <div class="border-b border-gray-200 px-6">
                 <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                     <button
@@ -454,9 +454,9 @@ const handleSubmit = () => {
                 </nav>
             </div>
 
-            <!-- Tab Contents -->
+            <!-- 탭 컨텐츠 -->
             <div class="p-6">
-                <!-- History Tab -->
+                <!-- 변경 이력 탭 -->
                 <div v-if="activeTab === 'history'" class="space-y-4">
                     <div class="flex items-center gap-4 mb-4">
                         <button
@@ -557,9 +557,9 @@ const handleSubmit = () => {
                     </div>
                 </div>
 
-                <!-- Comments Tab -->
+                <!-- 코멘트 탭 -->
                 <div v-if="activeTab === 'comments'" class="space-y-6">
-                    <!-- Comment Input -->
+                    <!-- 코멘트 입력 -->
                     <div class="flex gap-4">
                         <div
                             class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
@@ -588,14 +588,14 @@ const handleSubmit = () => {
                         </div>
                     </div>
 
-                    <!-- Comments List -->
+                    <!-- 코멘트 리스트 -->
                     <div class="space-y-6">
                         <div
                             v-for="comment in comments"
                             :key="comment.id"
                             class="space-y-4"
                         >
-                            <!-- Main Comment -->
+                            <!-- 메인 코멘트 -->
                             <div
                                 class="group flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                             >
@@ -657,7 +657,7 @@ const handleSubmit = () => {
                                 </div>
                             </div>
 
-                            <!-- Replies List -->
+                            <!-- 대댓글 리스트 -->
                             <div
                                 v-if="
                                     comment.replies &&

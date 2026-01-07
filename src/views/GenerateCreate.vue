@@ -1,16 +1,34 @@
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
 import {getOllamaModels, startGeneration} from "../services/api.js";
-import {fetchProjects} from "../services/projectApi.js"; // Import added
+import {fetchProjects, fetchProjectDetail} from "../services/projectApi.js";
 import type {OllamaModel} from "../types/ollama.js";
-import type {ProjectResponse} from "../types/project.js"; // Import added
+import {
+    type ProjectResponse,
+    type ProjectArtifact,
+    ARTIFACT_LABELS,
+    ARTIFACT_TYPES,
+} from "../types/project.js";
 import router from "../router/index.js";
+import BaseModal from "../components/BaseModal.vue";
 
-// 폼 상태 (지금은 목업용 기본값)
-const title = ref("SKT Agent Bench 자동 생성");
-const selectedProject = ref("SKT Agent Bench");
-const selectedArtifact = ref("화면설계서");
-const selectedFeature = ref("로그인");
+// 날짜 포맷 헬퍼
+const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    return dateStr.split("T")[0];
+};
+
+// TC 생성 수행명 상태
+const title = ref("");
+
+// 프로젝트 상세 및 선택 상태
+const selectedProjectDetail = ref<ProjectResponse | null>(null);
+const detailLoading = ref(false);
+const showRefModal = ref(false);
+
+const selectedArtifactIds = ref<number[]>([]);
+const selectedFeatureIds = ref<number[]>([]);
+const selectedExternalSystemIds = ref<number[]>([]);
 
 const llmModels = ref<string[]>([]);
 const selectedModel = ref<string>("");
@@ -18,13 +36,145 @@ const modelsLoading = ref(false);
 const modelsError = ref<string | null>(null);
 
 const selectedLanguage = ref("한글");
-
-const tcPrefix = ref("SAB");
+const tcPrefix = ref("PRJ");
 
 // 프로젝트 목록 상태
 const projects = ref<ProjectResponse[]>([]);
 const projectsLoading = ref(false);
 const selectedProjectId = ref<number | null>(null);
+
+import {watch, computed} from "vue";
+
+// 프로젝트 변경 감지
+watch(selectedProjectId, async (newId) => {
+    if (!newId) {
+        selectedProjectDetail.value = null;
+        selectedArtifactIds.value = [];
+        selectedFeatureIds.value = [];
+        selectedExternalSystemIds.value = [];
+        tcPrefix.value = "PRJ";
+        return;
+    }
+
+    // 프로젝트 ID 기반 Prefix 설정
+    tcPrefix.value = `PRJ${newId}`;
+
+    detailLoading.value = true;
+    try {
+        const detail = await fetchProjectDetail(newId);
+        console.log("API Response Detail:", detail);
+        console.log("First Artifact:", detail.artifacts?.[0]);
+        selectedProjectDetail.value = detail;
+
+        // 기본값: 모든 산출물/기능/외부시스템 선택
+        selectedArtifactIds.value = detail.artifacts.map((a) => a.id);
+        selectedFeatureIds.value = detail.features.map((f) => f.id);
+        selectedExternalSystemIds.value = detail.external_systems
+            .filter((sys) => sys.enabled)
+            .map((sys) => sys.id);
+    } catch (e) {
+        console.error("Project Detail Load Failed", e);
+    } finally {
+        detailLoading.value = false;
+    }
+});
+
+// 모달용 산출물 그룹핑 계산
+const groupedArtifacts = computed(() => {
+    if (!selectedProjectDetail.value) return {};
+
+    // 타입별 그룹 초기화
+    const groups: Record<string, ProjectArtifact[]> = {};
+
+    Object.values(ARTIFACT_TYPES).forEach((type) => {
+        groups[type] = [];
+    });
+
+    selectedProjectDetail.value.artifacts.forEach((artifact) => {
+        const type = artifact.artifact_type || ARTIFACT_TYPES.ETC;
+        if (!groups[type]) groups[type] = [];
+        groups[type].push(artifact);
+    });
+
+    // 빈 그룹 제거
+    return Object.fromEntries(
+        Object.entries(groups).filter(([_, items]) => items.length > 0)
+    );
+});
+
+// 선택 헬퍼 함수들
+const toggleArtifact = (id: number) => {
+    const s = new Set(selectedArtifactIds.value);
+    if (s.has(id)) {
+        s.delete(id);
+    } else {
+        s.add(id);
+    }
+    selectedArtifactIds.value = Array.from(s);
+};
+
+const toggleFeature = (id: number | undefined) => {
+    if (id === undefined || id === null) return;
+    const targetId = Number(id);
+    if (isNaN(targetId)) return;
+
+    const s = new Set(selectedFeatureIds.value);
+
+    if (s.has(targetId)) {
+        s.delete(targetId);
+    } else {
+        s.add(targetId);
+    }
+    selectedFeatureIds.value = Array.from(s);
+};
+
+const toggleExternalSystem = (id: number | undefined) => {
+    if (id === undefined || id === null) return;
+    const targetId = Number(id);
+    if (isNaN(targetId)) return;
+
+    const s = new Set(selectedExternalSystemIds.value);
+    if (s.has(targetId)) {
+        s.delete(targetId);
+    } else {
+        s.add(targetId);
+    }
+    selectedExternalSystemIds.value = Array.from(s);
+};
+
+const isCategorySelected = (type: string) => {
+    const items = groupedArtifacts.value[type] || [];
+    if (items.length === 0) return false;
+    return items.every((item) => selectedArtifactIds.value.includes(item.id));
+};
+
+const toggleCategory = (type: string) => {
+    const items = groupedArtifacts.value[type] || [];
+    if (items.length === 0) return;
+
+    const idsInGroup = items.map((i) => i.id);
+    const s = new Set(selectedArtifactIds.value);
+
+    // 그룹 내 모든 아이템이 선택되어 있는지 확인
+    const allSelected = idsInGroup.every((id) => s.has(id));
+
+    if (allSelected) {
+        // 전체 해제
+        idsInGroup.forEach((id) => s.delete(id));
+    } else {
+        // 전체 선택
+        idsInGroup.forEach((id) => s.add(id));
+    }
+    selectedArtifactIds.value = Array.from(s);
+};
+
+const getArtifactCount = (type: string) => {
+    const items = groupedArtifacts.value[type] || [];
+    const selected = items.filter((i) =>
+        selectedArtifactIds.value.includes(i.id)
+    ).length;
+    return `${selected}/${items.length}`;
+};
 
 // 초기 데이터 로드 (Projects + Ollama Models)
 onMounted(async () => {
@@ -33,10 +183,6 @@ onMounted(async () => {
     try {
         const projectData = await fetchProjects();
         projects.value = projectData;
-        if (projects.value.length > 0) {
-            selectedProjectId.value = projects.value[0].id;
-            selectedProject.value = projects.value[0].name; // UI 호환용 (Legacy)
-        }
     } catch (e) {
         console.error("Failed to fetch projects", e);
     } finally {
@@ -67,39 +213,38 @@ onMounted(async () => {
 });
 
 const handleCancel = () => {
-    // 일단은 리셋 정도만
-    title.value = "SKT Agent Bench 자동 생성";
-    selectedProject.value = "SKT Agent Bench";
-    selectedArtifact.value = "화면설계서";
-    selectedFeature.value = "로그인";
-
-    if (llmModels.value.length > 0) {
-        selectedModel.value = llmModels.value[0];
-    } else {
-        selectedModel.value = "";
-    }
-
-    selectedLanguage.value = "한글";
-    tcPrefix.value = "SAB";
+    router.back();
 };
 
 const isSubmitting = ref(false);
 const generationStatus = ref<"idle" | "generating" | "done">("idle");
 const handleSubmit = () => {
     if (isSubmitting.value) return;
+    if (!selectedProjectId.value) {
+        alert("프로젝트를 선택해주세요.");
+        return;
+    }
+
     isSubmitting.value = true;
     generationStatus.value = "generating";
 
     startGeneration({
-        project_id: selectedProjectId.value ?? 1, // 선택된 ID 사용
+        project_id: selectedProjectId.value, // 선택된 ID 사용
         title: title.value,
         model: selectedModel.value,
         language: selectedLanguage.value,
         tcPrefix: tcPrefix.value,
+        artifact_ids: selectedArtifactIds.value,
+        feature_ids: selectedFeatureIds.value,
+        external_system_ids: selectedExternalSystemIds.value,
     }).catch((error) => {
         console.error("자동 생성 시작 중 오류 발생:", error);
+        alert("생성 요청 중 오류가 발생했습니다: " + error.message);
+        isSubmitting.value = false;
+        generationStatus.value = "idle";
     });
 
+    // 생성 완료 후 페이지 이동
     setTimeout(() => {
         generationStatus.value = "done";
     }, 1500);
@@ -153,14 +298,14 @@ const handleSubmit = () => {
                                 class="block text-xs font-semibold text-slate-700"
                                 for="title"
                             >
-                                수행 타이틀
+                                TC 생성 수행명
                             </label>
                             <input
                                 id="title"
                                 v-model="title"
                                 type="text"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                placeholder="예: SAB"
+                                placeholder="TC 생성 수행명을 입력해주세요."
                             />
                         </div>
                     </div>
@@ -170,79 +315,286 @@ const handleSubmit = () => {
                     class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
                 >
                     <!-- 왼쪽: 폼 -->
-                    <div
-                        class="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                    >
-                        <!-- 프로젝트 -->
-                        <div class="space-y-1.5">
-                            <label
-                                class="block text-xs font-semibold text-slate-700"
-                                for="project"
-                            >
-                                프로젝트 명
-                            </label>
-                            <select
-                                id="project"
-                                v-model="selectedProjectId"
-                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            >
-                                <option v-if="projectsLoading" :value="null">
-                                    로딩 중...
-                                </option>
-                                <option
-                                    v-else-if="projects.length === 0"
-                                    :value="null"
+                    <div class="flex-1 flex flex-col gap-6">
+                        <!-- 1. Row: 프로젝트 선택 + 정보 -->
+                        <div class="space-y-4">
+                            <!-- 프로젝트 선택 -->
+                            <div class="space-y-1.5">
+                                <label
+                                    class="block text-xs font-semibold text-slate-700"
+                                    for="project"
                                 >
-                                    프로젝트 없음
-                                </option>
-                                <option
-                                    v-for="proj in projects"
-                                    :key="proj.id"
-                                    :value="proj.id"
+                                    프로젝트 명
+                                </label>
+                                <select
+                                    id="project"
+                                    v-model="selectedProjectId"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    :class="
+                                        selectedProjectId === null
+                                            ? 'text-slate-400'
+                                            : 'text-slate-700'
+                                    "
                                 >
-                                    {{ proj.name }}
-                                </option>
-                            </select>
+                                    <option
+                                        v-if="projectsLoading"
+                                        :value="null"
+                                        disabled
+                                    >
+                                        로딩 중...
+                                    </option>
+                                    <option
+                                        v-else-if="projects.length === 0"
+                                        :value="null"
+                                        disabled
+                                    >
+                                        프로젝트 없음
+                                    </option>
+                                    <option
+                                        v-else
+                                        :value="null"
+                                        disabled
+                                        hidden
+                                    >
+                                        수행할 프로젝트를 선택하세요
+                                    </option>
+                                    <option
+                                        v-for="proj in projects"
+                                        :key="proj.id"
+                                        :value="proj.id"
+                                        class="text-slate-700"
+                                    >
+                                        {{ proj.name }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- 프로젝트 정보 표시 -->
+                            <div
+                                v-if="selectedProjectDetail"
+                                class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-3"
+                            >
+                                <!-- Header: Name & Type -->
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1 pr-2">
+                                        <h3
+                                            class="text-sm font-bold text-slate-900"
+                                        >
+                                            {{ selectedProjectDetail.name }}
+                                        </h3>
+                                        <p
+                                            class="text-xs text-slate-500 mt-1 mb-1 line-clamp-2"
+                                        >
+                                            {{
+                                                selectedProjectDetail.description ||
+                                                "설명이 없습니다."
+                                            }}
+                                        </p>
+                                        <p class="text-[11px] text-slate-400">
+                                            마지막 수정:
+                                            {{
+                                                formatDate(
+                                                    selectedProjectDetail.updated_at
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                    <span
+                                        class="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 shrink-0"
+                                    >
+                                        {{ selectedProjectDetail.service_type }}
+                                    </span>
+                                </div>
+
+                                <!-- Stats Grid -->
+                                <div
+                                    class="grid grid-cols-3 gap-2 border-t border-b border-slate-100 py-2.5 bg-slate-50/50 rounded-md"
+                                >
+                                    <div class="text-center">
+                                        <span
+                                            class="block text-[10px] text-slate-400 mb-0.5"
+                                            >산출물</span
+                                        >
+                                        <span
+                                            class="text-sm font-bold text-slate-700"
+                                            >{{
+                                                selectedProjectDetail.artifacts
+                                                    .length
+                                            }}</span
+                                        >
+                                    </div>
+                                    <div
+                                        class="text-center border-l border-slate-200"
+                                    >
+                                        <span
+                                            class="block text-[10px] text-slate-400 mb-0.5"
+                                            >기능</span
+                                        >
+                                        <span
+                                            class="text-sm font-bold text-slate-700"
+                                            >{{
+                                                selectedProjectDetail.features
+                                                    .length
+                                            }}</span
+                                        >
+                                    </div>
+                                    <div
+                                        class="text-center border-l border-slate-200"
+                                    >
+                                        <span
+                                            class="block text-[10px] text-slate-400 mb-0.5"
+                                            >TC</span
+                                        >
+                                        <span
+                                            class="text-sm font-bold text-slate-700"
+                                            >{{
+                                                selectedProjectDetail.tc_count
+                                            }}</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                v-else
+                                class="flex items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-400"
+                            >
+                                프로젝트를 선택하면 요약 정보가 표시됩니다.
+                            </div>
                         </div>
 
-                        <!-- 산출물 -->
+                        <!-- 2. Row: 산출물 (New Trigger) - Full Width -->
                         <div class="space-y-1.5">
                             <label
                                 class="block text-xs font-semibold text-slate-700"
-                                for="artifact"
                             >
                                 참고할 산출물
                             </label>
-                            <select
-                                id="artifact"
-                                v-model="selectedArtifact"
-                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            >
-                                <option>전체</option>
-                                <option>화면설계서</option>
-                                <option>API 명세서</option>
-                                <option>요구사항 정의서</option>
-                            </select>
-                        </div>
 
-                        <!-- 기능 분류 -->
-                        <div class="space-y-1.5">
-                            <label
-                                class="block text-xs font-semibold text-slate-700"
-                                for="feature"
+                            <div v-if="selectedProjectDetail" class="space-y-3">
+                                <!-- Reference Management Panel -->
+                                <div
+                                    class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-indigo-300"
+                                >
+                                    <div
+                                        class="flex items-start justify-between mb-3"
+                                    >
+                                        <div class="flex items-center gap-2">
+                                            <div
+                                                class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-indigo-600"
+                                            >
+                                                <span
+                                                    class="material-icons-outlined text-lg"
+                                                    >library_books</span
+                                                >
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-800"
+                                                >
+                                                    참고 자료 구성
+                                                </p>
+                                                <p
+                                                    class="text-[11px] text-slate-400"
+                                                >
+                                                    테스트케이스 생성 기반 문서
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            @click="showRefModal = true"
+                                            class="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+                                        >
+                                            <span
+                                                v-if="
+                                                    selectedArtifactIds.length >
+                                                        0 ||
+                                                    selectedFeatureIds.length >
+                                                        0 ||
+                                                    selectedExternalSystemIds.length >
+                                                        0
+                                                "
+                                            >
+                                                변경하기
+                                            </span>
+                                            <span v-else> 자료 선택 </span>
+                                        </button>
+                                    </div>
+
+                                    <!-- Selection Summary -->
+                                    <div
+                                        v-if="
+                                            selectedArtifactIds.length > 0 ||
+                                            selectedFeatureIds.length > 0 ||
+                                            selectedExternalSystemIds.length > 0
+                                        "
+                                        class="flex flex-wrap gap-2"
+                                    >
+                                        <div
+                                            v-if="
+                                                selectedArtifactIds.length > 0
+                                            "
+                                            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
+                                        >
+                                            <span
+                                                class="material-icons-outlined text-[14px]"
+                                                >description</span
+                                            >
+                                            산출물
+                                            {{ selectedArtifactIds.length }}개
+                                        </div>
+                                        <div
+                                            v-if="selectedFeatureIds.length > 0"
+                                            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
+                                        >
+                                            <span
+                                                class="material-icons-outlined text-[14px]"
+                                                >dns</span
+                                            >
+                                            기능
+                                            {{ selectedFeatureIds.length }}개
+                                        </div>
+                                        <div
+                                            v-if="
+                                                selectedExternalSystemIds.length >
+                                                0
+                                            "
+                                            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
+                                        >
+                                            <span
+                                                class="material-icons-outlined text-[14px]"
+                                                >link</span
+                                            >
+                                            외부연동
+                                            {{
+                                                selectedExternalSystemIds.length
+                                            }}개
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-else
+                                        class="rounded-md border border-dashed border-slate-200 bg-slate-50 py-3 text-center"
+                                    >
+                                        <span class="text-xs text-slate-400">
+                                            선택된 참고 자료가 없습니다.
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Empty State -->
+                            <div
+                                v-else-if="detailLoading"
+                                class="h-10 flex items-center px-3 text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200"
                             >
-                                기능 분류
-                            </label>
-                            <select
-                                id="feature"
-                                v-model="selectedFeature"
-                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                불러오는 중...
+                            </div>
+                            <div
+                                v-else
+                                class="h-10 flex items-center px-3 text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200"
                             >
-                                <option>로그인</option>
-                                <option>회원가입</option>
-                                <option>결제</option>
-                                <option>검색</option>
-                            </select>
+                                프로젝트를 선택해주세요.
+                            </div>
                         </div>
                     </div>
 
@@ -258,18 +610,6 @@ const handleSubmit = () => {
                         프로젝트와 산출물을 선택하면<br />
                         해당 문서를 기준으로 테스트케이스를 생성합니다.
                     </aside>
-                </div>
-
-                <div class="mt-2">
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-violet-700"
-                    >
-                        <span class="material-icons-outlined text-sm">
-                            auto_awesome
-                        </span>
-                        AI 기능 자동분류
-                    </button>
                 </div>
             </section>
 
@@ -479,4 +819,282 @@ const handleSubmit = () => {
             </p>
         </div>
     </div>
+    <BaseModal
+        :isOpen="showRefModal"
+        title="산출물 및 기능 상세 선택"
+        subTitle="생성에 활용할 참고 자료를 선택하세요."
+        @close="showRefModal = false"
+    >
+        <div class="space-y-8">
+            <!-- 1. Artifacts Grouped -->
+            <section class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4
+                        class="text-sm font-bold text-gray-900 flex items-center gap-2"
+                    >
+                        <span
+                            class="material-icons-outlined text-indigo-500 text-base"
+                            >folder_open</span
+                        >
+                        산출물 파일
+                    </h4>
+                    <span class="text-xs text-gray-400"
+                        >{{ selectedArtifactIds.length }}개 선택됨</span
+                    >
+                </div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <div
+                        v-for="(files, type) in groupedArtifacts"
+                        :key="type"
+                        class="rounded-lg border border-gray-200 overflow-hidden"
+                    >
+                        <!-- Group Header -->
+                        <div
+                            class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-100"
+                        >
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="text-sm font-semibold text-gray-700"
+                                >
+                                    {{
+                                        ARTIFACT_LABELS[
+                                            type as keyof typeof ARTIFACT_LABELS
+                                        ] || type
+                                    }}
+                                </span>
+                                <span
+                                    class="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[10px] text-gray-500 font-medium"
+                                >
+                                    {{ getArtifactCount(type) }}
+                                </span>
+                            </div>
+                            <div
+                                class="flex items-center gap-2 cursor-pointer"
+                                @click="toggleCategory(type)"
+                            >
+                                <span class="text-xs text-gray-500">{{
+                                    isCategorySelected(type)
+                                        ? "전체 해제"
+                                        : "전체 선택"
+                                }}</span>
+                                <div
+                                    class="custom-toggle"
+                                    :class="
+                                        isCategorySelected(type)
+                                            ? 'custom-toggle-active'
+                                            : 'custom-toggle-inactive'
+                                    "
+                                >
+                                    <span
+                                        class="custom-toggle-circle"
+                                        :class="
+                                            isCategorySelected(type)
+                                                ? 'custom-toggle-circle-on'
+                                                : 'custom-toggle-circle-off'
+                                        "
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Files List -->
+                        <div class="p-2 bg-white">
+                            <div
+                                v-for="file in files"
+                                :key="file.id"
+                                class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md transition-colors cursor-pointer"
+                                @click="toggleArtifact(file.id)"
+                            >
+                                <div
+                                    class="custom-checkbox"
+                                    :class="
+                                        selectedArtifactIds.includes(file.id)
+                                            ? 'custom-checkbox-indigo'
+                                            : 'custom-checkbox-unchecked'
+                                    "
+                                >
+                                    <span
+                                        v-if="
+                                            selectedArtifactIds.includes(
+                                                file.id
+                                            )
+                                        "
+                                        class="material-icons text-white text-sm"
+                                        >check</span
+                                    >
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p
+                                        class="text-sm text-gray-700 truncate font-medium"
+                                    >
+                                        {{ file.name }}
+                                    </p>
+                                    <p class="text-xs text-gray-400 truncate">
+                                        {{ file.file_name }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="border-gray-100" />
+
+            <!-- 2. External Systems Group -->
+            <section class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4
+                        class="text-sm font-bold text-gray-900 flex items-center gap-2"
+                    >
+                        <span
+                            class="material-icons-outlined text-indigo-500 text-base"
+                            >link</span
+                        >
+                        외부 시스템 (Figma 등)
+                    </h4>
+                    <span class="text-xs text-gray-400"
+                        >{{ selectedExternalSystemIds.length }}개 선택됨</span
+                    >
+                </div>
+
+                <div class="bg-white rounded-lg border border-gray-200 p-2">
+                    <div
+                        v-if="
+                            selectedProjectDetail &&
+                            selectedProjectDetail.external_systems &&
+                            selectedProjectDetail.external_systems.length > 0
+                        "
+                        class="space-y-1"
+                    >
+                        <div
+                            v-for="(
+                                sys, idx
+                            ) in selectedProjectDetail.external_systems"
+                            :key="sys.id || idx"
+                            class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md transition-colors cursor-pointer"
+                            @click="sys.enabled && toggleExternalSystem(sys.id)"
+                            :class="{
+                                'opacity-50 cursor-not-allowed': !sys.enabled,
+                            }"
+                        >
+                            <div
+                                class="custom-checkbox"
+                                :class="
+                                    selectedExternalSystemIds.includes(sys.id)
+                                        ? 'custom-checkbox-indigo'
+                                        : 'custom-checkbox-unchecked'
+                                "
+                            >
+                                <span
+                                    v-if="
+                                        selectedExternalSystemIds.includes(
+                                            sys.id
+                                        )
+                                    "
+                                    class="material-icons text-white text-sm"
+                                    >check</span
+                                >
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-sm text-gray-700 font-medium">
+                                    {{ sys.system_type }}
+                                    <span
+                                        v-if="!sys.enabled"
+                                        class="text-xs text-red-400 ml-1"
+                                        >(비활성)</span
+                                    >
+                                </div>
+                                <div
+                                    class="text-xs text-gray-400 truncate max-w-[200px]"
+                                >
+                                    {{ sys.url }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="text-center py-4 text-xs text-gray-400">
+                        등록된 외부 시스템이 없습니다.
+                    </div>
+                </div>
+            </section>
+
+            <hr class="border-gray-100" />
+
+            <!-- 3. Features List -->
+            <section class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4
+                        class="text-sm font-bold text-gray-900 flex items-center gap-2"
+                    >
+                        <span
+                            class="material-icons-outlined text-green-500 text-base"
+                            >list_alt</span
+                        >
+                        기능 분류 목록
+                    </h4>
+                    <span class="text-xs text-gray-400"
+                        >{{ selectedFeatureIds.length }}개 선택됨</span
+                    >
+                </div>
+
+                <div class="bg-white rounded-lg border border-gray-200 p-2">
+                    <div
+                        v-if="
+                            selectedProjectDetail &&
+                            selectedProjectDetail.features &&
+                            selectedProjectDetail.features.length > 0
+                        "
+                        class="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                    >
+                        <div
+                            v-for="(
+                                feature, idx
+                            ) in selectedProjectDetail.features"
+                            :key="feature.id || idx"
+                            class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md transition-colors cursor-pointer"
+                            @click="toggleFeature(feature.id)"
+                        >
+                            <div
+                                class="custom-checkbox"
+                                :class="
+                                    selectedFeatureIds.includes(feature.id)
+                                        ? 'custom-checkbox-green'
+                                        : 'custom-checkbox-unchecked'
+                                "
+                            >
+                                <span
+                                    v-if="
+                                        selectedFeatureIds.includes(feature.id)
+                                    "
+                                    class="material-icons text-white text-sm"
+                                    >check</span
+                                >
+                            </div>
+                            <span class="text-sm text-gray-700">{{
+                                feature.name
+                            }}</span>
+                        </div>
+                    </div>
+                    <div v-else class="text-center py-4 text-xs text-gray-400">
+                        등록된 기능이 없습니다.
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <div
+            class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3"
+        >
+            <button
+                @click="showRefModal = false"
+                class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm hover:bg-indigo-700 transition-colors"
+            >
+                선택 완료
+            </button>
+        </div>
+    </BaseModal>
 </template>
+```

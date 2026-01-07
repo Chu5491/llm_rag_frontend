@@ -53,7 +53,7 @@ const parseResponse = (data: any) => {
     }
 };
 
-// 통계
+// TC 통계 계산
 const stats = computed(() => ({
     total: testCases.value.length,
     high: testCases.value.filter((tc: TestCase) => tc.priority === "High")

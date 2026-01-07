@@ -91,7 +91,7 @@ onMounted(() => {
                 </button>
             </div>
 
-            <!-- 데이터 없음 -->
+            <!-- 프로젝트 목록 없는 경우 -->
             <div
                 v-else-if="projects.length === 0"
                 class="flex flex-col items-center justify-center py-20"
@@ -104,7 +104,7 @@ onMounted(() => {
                 </p>
             </div>
 
-            <!-- 테이블 (데이터 있음) -->
+            <!-- 프로젝트 목록 테이블 -->
             <div
                 v-else
                 class="overflow-x-auto rounded-lg border border-gray-100 bg-white"

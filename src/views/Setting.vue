@@ -54,7 +54,7 @@ const fetchInitialData = async () => {
     errorMessage.value = null;
 
     try {
-        // 1. Fetch App Config
+        // 앱 설정 로드
         const config = await getAppConfig();
         ragBatchSize.value = config.rag_batch_size ?? 3;
         maxTcCount.value = config.rag_tc_count ?? 20;
@@ -63,21 +63,21 @@ const fetchInitialData = async () => {
         selectedModel.value = config.llm_model ?? "";
         selectedEmbeddingModel.value = config.embedding_model ?? "";
 
-        // 2. Fetch Ollama Models
+        // Ollama 모델 로드
         const modelData = await getOllamaModels();
         const models: OllamaModel[] = modelData.models ?? [];
 
-        // Filter LLM models (exclude bge)
+        // LLM 모델 필터링 (bge 제외)
         llmModels.value = models
             .filter((m) => !m.name.includes("bge"))
             .map((m) => m.name);
 
-        // Filter Embedding models (only bge related) - assuming based on common patterns
+        // 임베딩 모델 필터링 (bge 포함)
         embeddingModels.value = models
             .filter((m) => m.name.includes("bge"))
             .map((m) => m.name);
 
-        // Sync selected LLM model
+        // 선택된 LLM 모델 동기화
         if (
             selectedModel.value === "" ||
             !llmModels.value.includes(selectedModel.value)
@@ -87,7 +87,7 @@ const fetchInitialData = async () => {
             }
         }
 
-        // Sync selected Embedding model
+        // 선택된 임베딩 모델 동기화
         if (
             selectedEmbeddingModel.value === "" ||
             !embeddingModels.value.includes(selectedEmbeddingModel.value)
@@ -157,16 +157,8 @@ onMounted(() => {
                     </span>
                     저장됨
                 </span>
-                <button
-                    @click="handleSave"
-                    class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
-                    저장
-                </button>
-                <button
-                    @click="handleReset"
-                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
+                <button @click="handleSave" class="btn-primary">저장</button>
+                <button @click="handleReset" class="btn-secondary">
                     초기화
                 </button>
             </div>
@@ -385,19 +377,24 @@ onMounted(() => {
                         </span>
 
                         <!-- Toggle -->
-                        <button
-                            type="button"
-                            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                            :class="isFigma ? 'bg-indigo-600' : 'bg-gray-200'"
+                        <div
+                            class="custom-toggle"
+                            :class="
+                                isFigma
+                                    ? 'custom-toggle-active'
+                                    : 'custom-toggle-inactive'
+                            "
                             @click="isFigma = !isFigma"
                         >
                             <span
-                                class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200"
+                                class="custom-toggle-circle"
                                 :class="
-                                    isFigma ? 'translate-x-5' : 'translate-x-0'
+                                    isFigma
+                                        ? 'custom-toggle-circle-on'
+                                        : 'custom-toggle-circle-off'
                                 "
                             />
-                        </button>
+                        </div>
                     </div>
                 </section>
             </div>

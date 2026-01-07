@@ -8,8 +8,6 @@ import {
     ExternalSystemItem,
     ProjectBase,
     ProjectCreate,
-    ArtifactCreate,
-    ExternalSystemCreate,
     ArtifactType,
     ARTIFACT_TYPES,
     ARTIFACT_LABELS,
@@ -19,24 +17,19 @@ import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
 
 const router = useRouter();
 
-// === 저장 상태 ===
-// idle  : 평상시
-// saving: 5초 동안 임베딩/저장 중
-// done  : 1~1.5초 정도 완료 화면
+// 저장 상태 (idle, saving, done)
 const saveStatus = ref<"idle" | "saving" | "done">("idle");
 let saveTimer: number | undefined;
 let redirectTimer: number | undefined;
 
-// 1. 프로젝트 기본 정보
+// 프로젝트 기본 정보
 const projectBase = ref<ProjectBase>({
     name: "",
     service_type: "",
     description: "",
 });
 
-// 추가 필드 (UI 전용, 백엔드 미지원 시 임시 상태)
-
-// 카테고리 순서 정의 (화면 표시 순서)
+// 카테고리 표시 순서
 const ORDERED_CATEGORIES: ArtifactType[] = [
     ARTIFACT_TYPES.REQUIREMENTS,
     ARTIFACT_TYPES.SCREEN_DESIGN,
@@ -45,7 +38,7 @@ const ORDERED_CATEGORIES: ArtifactType[] = [
     ARTIFACT_TYPES.ETC,
 ];
 
-// 산출물 목록 (ArtifactItem 확장)
+// 산출물 목록
 const artifacts = ref<ArtifactItem[]>([]);
 
 let nextArtifactId = 1;
@@ -81,22 +74,14 @@ const handleFileChange = (event: Event) => {
         name: file.name,
         has_file: true,
         file: file,
+        file_size: file.size,
         selected: true,
     });
 
     targetCategory.value = null;
 };
 
-const removeFile = (artifactId?: number) => {
-    if (artifactId === undefined) return;
-    const artifact = artifacts.value.find((a) => a.id === artifactId);
-    if (artifact) {
-        artifact.file = undefined;
-        artifact.has_file = false;
-    }
-};
-
-/* 외부 시스템 타입 정의 - ExternalSystemItem 사용 */
+// 외부 시스템 정의
 type ExternalSystemId = "figma";
 
 const externalSystems = ref<ExternalSystemItem[]>([
@@ -111,10 +96,10 @@ const externalSystems = ref<ExternalSystemItem[]>([
     },
 ]);
 
-/* 현재 팝업에 열려 있는 시스템 id */
+// 외부 연동 팝업 상태
 const activeExternalPopup = ref<ExternalSystemId | null>(null);
 
-/* 팝업에서 사용하는 시스템 객체 */
+// 팝업용 활성 시스템 객체
 const activeExternalSystem = computed(
     () =>
         externalSystems.value.find(
@@ -122,25 +107,25 @@ const activeExternalSystem = computed(
         ) ?? null
 );
 
-/* 팝업 내 에러 메시지 */
+// 팝업 에러 메시지
 const popupError = ref<string | null>(null);
 
-/* 카드 오른쪽 토글 클릭 시 */
+// 외부 시스템 토글 처리
 const toggleExternalSystem = (id: ExternalSystemId) => {
     const system = externalSystems.value.find((s) => s.system_type === id);
     if (!system) return;
 
-    // off → on 되는 순간에만 팝업 띄우기
+    // Off -> On: 팝업 오픈
     if (!system.enabled) {
         system.enabled = true;
         activeExternalPopup.value = id;
     } else {
-        // 다시 끌 때는 단순 off
+        // On -> Off: 즉시 비활성화
         system.enabled = false;
     }
 };
 
-/* 팝업에서 취소 */
+// 팝업 취소
 const cancelExternalPopup = () => {
     // 취소 시 enable을 끌지 말지 선택 가능 (여기선 끄는 쪽으로 처리)
     if (activeExternalSystem.value) {
@@ -149,7 +134,7 @@ const cancelExternalPopup = () => {
     activeExternalPopup.value = null;
 };
 
-/* 팝업에서 저장 */
+// 외부 연동 설정 저장 (연결 확인)
 const saveExternalConfig = async () => {
     const system = activeExternalSystem.value;
     if (!system) return;
@@ -175,7 +160,7 @@ const saveExternalConfig = async () => {
 };
 
 const handleCancel = () => {
-    if (saveStatus.value !== "idle") return; // 저장 중/완료 표시 중에는 취소 막기
+    if (saveStatus.value !== "idle") return; // 저장 중일 때 취소 방지
     projectBase.value.name = "";
     projectBase.value.service_type = "";
     projectBase.value.description = "";
@@ -185,11 +170,11 @@ const handleCancel = () => {
 const handleSubmit = async () => {
     if (saveStatus.value !== "idle") return;
 
-    // 1단계: 저장 중 상태로
+    // 1. 저장 중 상태 전환
     saveStatus.value = "saving";
 
     try {
-        // UI용 필드 제거 및 데이터 정제
+        // UI 필드 제거 및 데이터 정제
         const payload: ProjectCreate = {
             name: projectBase.value.name,
             description: projectBase.value.description,
@@ -199,6 +184,7 @@ const handleSubmit = async () => {
                 name: a.name,
                 has_file: a.has_file,
                 file: a.file,
+                file_size: a.file_size,
             })),
             external_systems: externalSystems.value.map((e) => ({
                 system_type: e.system_type,
@@ -211,10 +197,10 @@ const handleSubmit = async () => {
         // API 호출
         await createProject(payload);
 
-        // 2단계: 완료 상태로 전환
+        // 2. 완료 상태 전환
         saveStatus.value = "done";
 
-        // 1.5초 정도 완료 표시해준 뒤 목록으로 이동
+        // 1.5초 후 목록 이동
         redirectTimer = window.setTimeout(() => {
             saveStatus.value = "idle";
             router.push("/project");
@@ -242,7 +228,7 @@ const formatFileSize = (bytes: number) => {
 
 <template>
     <main class="p-6 space-y-6">
-        <!-- Header Section -->
+        <!-- 헤더 영역 -->
         <header class="flex justify-between items-start">
             <div>
                 <p class="mt-1 text-sm text-gray-500">
@@ -251,10 +237,10 @@ const formatFileSize = (bytes: number) => {
             </div>
         </header>
 
-        <!-- Main Content -->
+        <!-- 메인 컨텐츠 -->
         <section class="rounded-lg bg-white p-6 shadow space-y-8">
             <form class="space-y-8" @submit.prevent>
-                <!-- 1. Basic Info Section -->
+                <!-- 1. 기본 정보 -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4">
                         1. 프로젝트 기본 정보
@@ -318,7 +304,7 @@ const formatFileSize = (bytes: number) => {
                     </div>
                 </div>
 
-                <!-- 2. Arifacts Section -->
+                <!-- 2. 산출물 영역 -->
                 <div>
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-medium text-gray-900">
@@ -380,63 +366,82 @@ const formatFileSize = (bytes: number) => {
                                         (a) => a.artifact_type === category
                                     )"
                                     :key="item.id"
-                                    class="group flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white p-2 rounded border border-gray-200 shadow-sm hover:border-indigo-300 transition-colors"
+                                    class="group flex items-center gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-500 transition-all"
                                 >
+                                    <!-- 아이콘 -->
                                     <div
-                                        class="flex-1 min-w-0 flex items-center gap-2"
+                                        class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-50 border border-gray-100"
                                     >
                                         <span
-                                            class="material-icons-outlined text-sm"
+                                            class="material-icons-outlined text-xl"
                                             :class="
                                                 getFileIconColor(
                                                     item.file?.name
                                                 )
                                             "
-                                            >{{
-                                                getFileIcon(item.file?.name)
-                                            }}</span
                                         >
-                                        <div class="flex flex-col min-w-0">
+                                            {{ getFileIcon(item.file?.name) }}
+                                        </span>
+                                    </div>
+
+                                    <!-- 파일 정보 및 수정 -->
+                                    <div class="flex-1 min-w-0 flex flex-col">
+                                        <!-- 별칭 수정 -->
+                                        <div class="relative">
+                                            <input
+                                                v-model="item.name"
+                                                type="text"
+                                                class="block w-full border-0 border-b border-transparent p-0 pb-0.5 text-sm font-semibold text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-0 transition-colors bg-transparent"
+                                                placeholder="파일 별칭 입력"
+                                            />
                                             <span
-                                                class="text-xs text-gray-600 truncate"
-                                                >{{
-                                                    item.file?.name ||
-                                                    "파일 없음"
-                                                }}</span
+                                                class="absolute right-0 top-0 text-[10px] text-gray-300 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <span
+                                                    class="material-icons-outlined text-[10px] align-middle mr-0.5"
+                                                    >edit</span
+                                                >
+                                                수정 가능
+                                            </span>
+                                        </div>
+
+                                        <!-- 원본 파일 정보 -->
+                                        <div
+                                            class="flex items-center gap-1.5 mt-1"
+                                        >
+                                            <span
+                                                class="material-icons-outlined text-[10px] text-gray-400"
+                                                >attach_file</span
                                             >
                                             <span
-                                                v-if="item.file"
-                                                class="text-[10px] text-gray-400"
+                                                class="text-[11px] text-gray-400 truncate"
+                                            >
+                                                {{ item.file?.name }}
+                                            </span>
+                                            <span
+                                                class="text-[10px] text-gray-300"
                                             >
                                                 {{
                                                     formatFileSize(
-                                                        item.file.size
+                                                        item.file?.size || 0
                                                     )
                                                 }}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <input
-                                        v-model="item.name"
-                                        type="text"
-                                        class="w-full sm:w-1/3 text-xs px-2 py-1.5 rounded border border-gray-300 text-gray-700 placeholder-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                                        placeholder="파일 별칭"
-                                    />
-
-                                    <div class="flex justify-end sm:block">
-                                        <button
-                                            class="text-gray-400 hover:text-red-500 transition-colors p-1"
-                                            title="삭제"
-                                            type="button"
-                                            @click="removeArtifactRow(item.id)"
+                                    <!-- 삭제 버튼 -->
+                                    <button
+                                        class="shrink-0 text-gray-300 hover:text-red-500 transition-colors p-1.5 rounded-full hover:bg-red-50"
+                                        title="삭제"
+                                        type="button"
+                                        @click="removeArtifactRow(item.id)"
+                                    >
+                                        <span
+                                            class="material-icons-outlined text-xl"
+                                            >close</span
                                         >
-                                            <span
-                                                class="material-icons-outlined text-[18px]"
-                                                >close</span
-                                            >
-                                        </button>
-                                    </div>
+                                    </button>
                                 </div>
 
                                 <!-- 파일 목록이 없는 경우 -->
@@ -457,13 +462,13 @@ const formatFileSize = (bytes: number) => {
                     </div>
                 </div>
 
-                <!-- 3. External Systems Section -->
+                <!-- 3. 외부 시스템 영역 -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4">
                         3. 활용 시스템
                     </h3>
                     <div class="grid grid-cols-1 gap-4">
-                        <!-- Figma (Using ProjectDetail style) -->
+                        <!-- Figma 카드 -->
                         <div
                             class="flex items-center p-4 rounded-lg border border-gray-200 hover:border-indigo-500 bg-white shadow-sm transition-all"
                         >
@@ -479,35 +484,38 @@ const formatFileSize = (bytes: number) => {
                                     >
                                         Figma
                                     </h4>
-                                    <!-- Toggle -->
-                                    <label
-                                        class="relative inline-flex items-center cursor-pointer"
+                                    <!-- 토글 스위치 -->
+                                    <div
+                                        class="custom-toggle"
+                                        :class="
+                                            externalSystems.find(
+                                                (s) => s.system_type === 'figma'
+                                            )?.enabled
+                                                ? 'custom-toggle-active'
+                                                : 'custom-toggle-inactive'
+                                        "
+                                        @click="toggleExternalSystem('figma')"
                                     >
-                                        <input
-                                            type="checkbox"
-                                            class="sr-only peer"
-                                            :checked="
+                                        <span
+                                            class="custom-toggle-circle"
+                                            :class="
                                                 externalSystems.find(
                                                     (s) =>
                                                         s.system_type ===
                                                         'figma'
                                                 )?.enabled
-                                            "
-                                            @change="
-                                                toggleExternalSystem('figma')
+                                                    ? 'custom-toggle-circle-on'
+                                                    : 'custom-toggle-circle-off'
                                             "
                                         />
-                                        <div
-                                            class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"
-                                        ></div>
-                                    </label>
+                                    </div>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-1">
                                     디자인 산출물을 기반으로 테스트케이스를
                                     생성합니다.
                                 </p>
 
-                                <!-- Figma Status -->
+                                <!-- 연결 상태 -->
                                 <div
                                     v-if="
                                         externalSystems.find(
@@ -543,20 +551,20 @@ const formatFileSize = (bytes: number) => {
                     </div>
                 </div>
 
-                <!-- Bottom Buttons -->
+                <!-- 하단 버튼 -->
                 <div
                     class="flex justify-end gap-3 pt-6 border-t border-gray-100"
                 >
                     <button
                         type="button"
-                        class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        class="btn-secondary"
                         @click="handleCancel"
                     >
                         취소
                     </button>
                     <button
                         type="submit"
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        class="btn-primary"
                         @click="handleSubmit"
                     >
                         <span class="material-icons-outlined text-lg mr-1"
@@ -615,14 +623,14 @@ const formatFileSize = (bytes: number) => {
                 <div class="mt-6 flex justify-end gap-2">
                     <button
                         type="button"
-                        class="rounded-md border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        class="btn-secondary text-xs!"
                         @click="cancelExternalPopup"
                     >
                         취소
                     </button>
                     <button
                         type="button"
-                        class="rounded-md bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+                        class="btn-primary text-xs!"
                         @click="saveExternalConfig"
                     >
                         저장

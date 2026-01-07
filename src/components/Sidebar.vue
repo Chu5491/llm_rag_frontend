@@ -5,10 +5,7 @@ import {checkApiStatus as apiCheck} from "../services/api.js";
 
 const route = useRoute();
 
-// 아이콘 매핑을 위해 수정 (실제 아이콘 컴포넌트 사용 권장하지만, 여기서는 문자열 대신 컴포넌트나 SVG 사용 예시로 대체하지 않고 일단 텍스트 유지하거나 Heroicons 설치 가정. 설치가 안되어있다면 텍스트/이모지로 대체해야 함.)
-// User 환경에 Heroicons가 없을 수 있으므로 안전하게 텍스트/유니코드로 하거나 SVG 직접 삽입.
-// 여기서는 안전하게 SVG 문자열을 직접 넣거나 간단한 아이콘을 사용.
-// 일단 네비게이션 아이템 정의.
+// 네비게이션 아이템 정의
 
 const navItems = [
     {path: "/", name: "Dashboard", icon: "dashboard"},
@@ -26,7 +23,7 @@ const isActive = (path: string) => {
     return route.path === path || route.path.startsWith(`${path}/`);
 };
 
-// API 상태 로직 유지
+// API 상태 체크 로직
 const apiStatus = ref<"online" | "offline" | "checking">("checking");
 let statusInterval: number | undefined;
 

@@ -7,7 +7,7 @@ export type ProjectItemStatus =
     | "partial_success"
     | "error";
 
-// 산출물 타입 (DB 저장용 - English)
+// 산출물 타입 (DB 저장용)
 export const ARTIFACT_TYPES = {
     REQUIREMENTS: "requirements",
     SCREEN_DESIGN: "screen_design",
@@ -18,7 +18,7 @@ export const ARTIFACT_TYPES = {
 
 export type ArtifactType = (typeof ARTIFACT_TYPES)[keyof typeof ARTIFACT_TYPES];
 
-// UI 매핑 (English Key -> Korean Label)
+// UI 매핑 (Label)
 export const ARTIFACT_LABELS: Record<ArtifactType, string> = {
     [ARTIFACT_TYPES.REQUIREMENTS]: "요구사항명세서",
     [ARTIFACT_TYPES.SCREEN_DESIGN]: "화면설계서",
@@ -39,13 +39,14 @@ export const ARTIFACT_ICONS: Record<ArtifactType, string> = {
 export interface ProjectArtifact {
     id: number;
     project_id: number;
-    artifact_type: string; // '요구사항정의서', '화면설계서' 등
-    name: string; // 사용자 정의 산출물 명
+    artifact_type: string;
+    name: string;
     file_name: string | null;
-    extension: string | null; // .pdf, .docx
+    extension: string | null;
     has_file: boolean;
     file_path: string | null;
-    created_at: string; // TIMESTAMPTZ -> string
+    file_size?: number;
+    created_at: string;
     status?: ProjectItemStatus;
     last_error?: string | null;
 }
@@ -53,13 +54,18 @@ export interface ProjectArtifact {
 export interface ProjectExternalSystem {
     id: number;
     project_id: number;
-    system_type: string; // 'jira', 'figma'
+    system_type: string;
     url: string | null;
     enabled: boolean;
-    // pat는 보안상 DB 저장 안 함 -> Response에도 없음
     created_at: string;
     status?: ProjectItemStatus;
     last_error?: string | null;
+}
+
+export interface ProjectFeature {
+    id: number;
+    project_id: number;
+    name: string;
 }
 
 export interface ProjectBase {
@@ -74,7 +80,7 @@ export interface ArtifactCreate {
     artifact_type: string;
     name: string;
     has_file: boolean;
-    // 프론트엔드 전용 필드 (파일 업로드 등)
+    file_size?: number;
     id?: number; // UI only
     file?: File; // UI only
     selected?: boolean; // UI only
@@ -104,6 +110,7 @@ export interface ProjectResponse extends ProjectBase {
     updated_at: string;
     artifacts: ProjectArtifact[];
     external_systems: ProjectExternalSystem[];
+    features: ProjectFeature[];
     tc_count: number;
 }
 

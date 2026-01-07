@@ -4,7 +4,7 @@ import type {
     OllamaModelsResponse,
 } from "../types/ollama.js";
 
-// 백엔드 및 Ollama API 상태 확인
+// API 상태 확인 (Backend + Ollama)
 export async function checkApiStatus(): Promise<boolean> {
     try {
         const res = await fetch("/api/v1/ollama/status");
@@ -14,7 +14,7 @@ export async function checkApiStatus(): Promise<boolean> {
     }
 }
 
-// Ollama 서버에 설치된 모델 목록 조회
+// 설치된 Ollama 모델 목록 조회
 export async function getOllamaModels(): Promise<OllamaModelsResponse> {
     const res = await fetch("/api/v1/ollama/models");
     if (!res.ok) {
@@ -23,7 +23,7 @@ export async function getOllamaModels(): Promise<OllamaModelsResponse> {
     return res.json();
 }
 
-// Ollama 모델에 채팅 메시지 전송 (동기 응답)
+// 채팅 메시지 전송 (동기)
 export async function sendChatMessage(
     messages: ChatMessage[]
 ): Promise<ChatResponse> {

@@ -16,7 +16,7 @@ const expandedRows = ref(new Set<string | number>());
 const hasTestCases = computed(() => (props.testCases?.length ?? 0) > 0);
 const hasContexts = computed(() => props.contexts && props.contexts.length > 0);
 
-// 정렬된 테스트케이스
+// 정렬된 테스트케이스 목록 반환
 const sortedTestCases = computed(() => {
     const cases = [...(props.testCases || [])] as TestCase[];
     cases.sort((a, b) => {
@@ -45,11 +45,11 @@ const toggleRow = (id: string | number) => {
     } else {
         expandedRows.value.add(id);
     }
-    // Set 자체를 새로 할당해서 반응성 트리거
+    // 반응성 갱신을 위한 Set 재할당
     expandedRows.value = new Set(expandedRows.value);
 };
 
-// JSON 복사
+// TC 데이터를 JSON으로 클립보드 복사
 const copyAsJson = async () => {
     try {
         await navigator.clipboard.writeText(

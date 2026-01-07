@@ -4,14 +4,14 @@ import {useRouter} from "vue-router";
 
 const router = useRouter();
 
-// 테스트케이스 상세 페이지로 이동
+// TC 상세 이동
 const goToTestCaseDetail = (testCaseId) => {
     router.push({
         name: "TestCaseDetail",
         params: {id: testCaseId},
     });
 };
-// Sample data - replace with your actual data fetching logic
+// 샘플 데이터
 const testCases = ref([
     {
         id: "TC-001",
@@ -64,7 +64,7 @@ const projects = ref(["SKT Agent Bench", "T-Gen", "Samsung VOC"]);
 const selectedProject = ref("SKT Agent Bench");
 const searchQuery = ref("");
 
-// Computed property for filtered test cases
+// 검색 필터링된 TC 목록
 const filteredTestCases = computed(() => {
     return testCases.value.filter((testCase) => {
         const matchesSearch =
@@ -79,13 +79,13 @@ const filteredTestCases = computed(() => {
     });
 });
 
-// Format date for display
+// 날짜 포맷팅
 const formatDate = (dateString) => {
     const options = {year: "numeric", month: "2-digit", day: "2-digit"};
     return new Date(dateString).toLocaleDateString("ko-KR", options);
 };
 
-// Handle status button click
+// 상태 버튼 클릭 핸들러 (Cycle)
 const handleStatusClick = (testCase) => {
     // Cycle through statuses: approved -> ai -> rejected -> approved
     const statusOrder = ["approved", "ai", "rejected"];
@@ -94,13 +94,13 @@ const handleStatusClick = (testCase) => {
     testCase.status = statusOrder[nextIndex];
 };
 
-// Filter test cases by project
+// 프로젝트별 필터링
 const filterByProject = () => {
     // Add your project filtering logic here
     console.log("Filtering by project:", selectedProject.value);
 };
 
-// Filter test cases by search query
+// 검색 필터링 (Computed에서 처리)
 const filterTestCases = () => {
     // Search is handled by the computed property
 };

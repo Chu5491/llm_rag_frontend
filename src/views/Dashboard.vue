@@ -1,8 +1,7 @@
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>
 
 <template>
-    <!-- 대시보드 메인 래퍼 -->
+    <!-- 대시보드 레이아웃 래퍼 -->
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
         <header>
@@ -13,7 +12,7 @@
             </p>
         </header>
 
-        <!-- 메인 카드 -->
+        <!-- 메인 통계 카드 영역 -->
         <section class="rounded-lg bg-white p-6 shadow space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-blue-50 p-4 rounded-lg">

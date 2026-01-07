@@ -4,24 +4,20 @@ import type {
     ProjectUpdate,
 } from "../types/project.js";
 
-// ----------------------------------------------------------------------
-// 프로젝트(Projects) API
-// ----------------------------------------------------------------------
-
-// 프로젝트 생성
+// 프로젝트 생성 (FormData 사용)
 export async function createProject(
     data: ProjectCreate
 ): Promise<ProjectResponse> {
     const formData = new FormData();
 
-    // 1. 기본 필드
+    // 1. 기본 필드 설정
     formData.append("name", data.name);
     formData.append("service_type", data.service_type);
     if (data.description) {
         formData.append("description", data.description);
     }
 
-    // 2. Artifacts 처리 (파일이 있는 경우 name을 filename으로 강제)
+    // 2. Artifacts 처리 (파일 -> FormData, 메타데이터 -> JSON)
     const processedArtifacts = data.artifacts.map((artifact) => {
         // 파일이 있는 경우
         if (artifact.file) {
@@ -46,7 +42,7 @@ export async function createProject(
         JSON.stringify(data.external_systems)
     );
 
-    // 4. 전송 (Content-Type 헤더 제거 -> 브라우저가 boundary 자동 설정)
+    // 4. API 전송
     const res = await fetch("/api/v1/projects/", {
         method: "POST",
         body: formData,

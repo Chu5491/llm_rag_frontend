@@ -1,4 +1,4 @@
-// 생성된 테스트케이스 개별 항목 구조
+// 생성된 TC 항목 구조
 export type TestCase = {
     testcase_id: string | number; // TC 식별자
     title?: string; // 제목

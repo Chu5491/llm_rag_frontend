@@ -5,7 +5,7 @@ import type {
     StartGenerationResponse,
 } from "../types/Generate.js";
 
-// RAG 기반 테스트케이스 자동 생성 실행 (파일 또는 Figma 기반)
+// RAG 기반 TC 생성 (개별 파일/Figma)
 export async function generateTestCases(
     endpoint: "/api/v1/rag/generate/file" | "/api/v1/rag/generate/figma",
     model = "exaone3.5:2.4b"
@@ -19,7 +19,7 @@ export async function generateTestCases(
     return res.json();
 }
 
-// Figma 연동 정보 및 현재 상태 확인
+// Figma 연동 정보 및 상태 확인
 export async function checkFigmaPersist(
     url?: string,
     pat?: string
@@ -76,7 +76,7 @@ export async function fetchHistoryDetail(
     return res.json();
 }
 
-// running 상태인 히스토리들의 상세 정보를 주기적으로 조회하여 콜백으로 전달합니다.
+// 진행중인 항목 상태 주기적 조회 (Polling)
 export function pollRunningItems(
     itemIds: number[],
     onUpdate: (details: HistoryDetailResponse[]) => void,
@@ -112,6 +112,7 @@ export function pollRunningItems(
     };
 }
 
+// 테스트케이스 생성 시작 (통합)
 export const startGeneration = async (
     data: StartGenerationRequest
 ): Promise<StartGenerationResponse> => {
@@ -132,7 +133,7 @@ export const startGeneration = async (
     return response.json();
 };
 
-// RAG 생성 작업 중단
+// 작업 중단
 export async function cancelGeneration(historyId: number): Promise<any> {
     const res = await fetch(`/api/v1/history/cancel/${historyId}`, {
         method: "POST",
@@ -143,7 +144,7 @@ export async function cancelGeneration(historyId: number): Promise<any> {
     return res.json();
 }
 
-// RAG 생성 작업 재시도
+// 작업 재시도
 export async function retryGeneration(historyId: number): Promise<any> {
     const res = await fetch(`/api/v1/history/${historyId}/retry`, {
         method: "POST",

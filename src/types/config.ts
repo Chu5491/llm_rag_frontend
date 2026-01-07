@@ -1,4 +1,4 @@
-// 전역 앱 환경설정 응답 데이터 구조
+// 앱 전역 설정 (DB Response)
 export interface AppConfigResponse {
     id: number;
     embedding_model: string | null; // 기본 임베딩 모델 명

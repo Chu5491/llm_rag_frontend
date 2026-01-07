@@ -16,7 +16,7 @@ const messages = ref<Message[]>([
     {text: "안녕하세요! 무엇을 도와드릴까요?", sender: "bot"},
 ]);
 
-// 마크다운을 HTML로 변환
+// Markdown string -> HTML string 변환
 const renderMarkdown = (content: string): string => {
     return marked(content, {
         breaks: true,
@@ -42,7 +42,7 @@ const sendMessage = async () => {
     const userMessage = newMessage.value.trim();
     if (!userMessage || isLoading.value) return;
 
-    // 사용자 메시지 추가
+    // 유저 메시지 추가
     messages.value.push({
         text: userMessage,
         sender: "user",
@@ -51,17 +51,17 @@ const sendMessage = async () => {
     // 입력 필드 초기화
     newMessage.value = "";
 
-    // 로딩 상태 표시
+    // 로딩 시작
     isLoading.value = true;
     scrollToBottom();
 
     try {
-        // API 서비스를 사용하여 메시지 전송
+        // API 메시지 전송 처리
         const response = await sendChatMessage([
             {role: "user", content: userMessage},
         ]);
 
-        // 성공적인 응답 처리
+        // 응답 메시지 추가
         messages.value.push({
             text: response.raw.message.content,
             sender: "bot",

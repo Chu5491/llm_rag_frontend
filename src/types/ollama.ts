@@ -1,10 +1,10 @@
-// Ollama 채팅 메시지 구조 (role: user, assistant, system)
+// Ollama 채팅 메시지 구조
 export interface ChatMessage {
     role: "user" | "assistant" | "system";
     content: string;
 }
 
-// Ollama API의 원본 상세 통계 정보
+// Ollama API 원본 통계
 export interface OllamaRawStats {
     model: string;
     created_at: string;
@@ -19,14 +19,14 @@ export interface OllamaRawStats {
     eval_duration?: number;
 }
 
-// Ollama 채팅 응답 통합 구조 (T는 output의 타입)
+// Ollama 채팅 응답 통합 구조
 export interface ChatResponse<T = any> {
     success: boolean;
     output: T;
     raw: OllamaRawStats;
 }
 
-// Ollama에 설치된 각 모델의 상세 정보
+// 설치된 모델 상세 정보
 export interface OllamaModel {
     name: string;
     digest: string;
@@ -41,7 +41,7 @@ export interface OllamaModel {
     };
 }
 
-// Ollama 모델 목록 응답 구조
+// 모델 목록 응답
 export interface OllamaModelsResponse {
     models: OllamaModel[];
 }

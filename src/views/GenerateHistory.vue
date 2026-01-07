@@ -27,7 +27,7 @@ const stopPolling = ref<() => void>(); // 폴링을 중지하기 위한 함수 �
 const detailRequestSeq = ref(0);
 const POLL_INTERVAL_MS = 3000;
 
-// 진행 중인 항목들의 최신 상태를 histories에 반영.
+// 진행 중인 항목 상태 업데이트 (불변성 유지)
 const updateRunningItems = (details: HistoryDetailResponse[]) => {
     details.forEach((detail) => {
         const index = histories.value.findIndex(
@@ -54,25 +54,21 @@ const loadHistories = async () => {
         isLoading.value = true;
         error.value = null;
 
-        // 목록 갱신 시, 열려있는 상세 패널 상태를 초기화
+        // 상세 패널 초기화
         detailRequestSeq.value += 1;
         selectedHistoryId.value = null;
         selectedHistory.value = null;
         isDetailLoading.value = false;
         detailError.value = null;
 
-        // 기존 폴링이 실행 중이면 중지
-        if (stopPolling.value) {
-            stopPolling.value();
-            stopPolling.value = undefined;
-        }
+        // 폴링 중단
         // 히스토리 목록 가져오기
         const data = await fetchHistories();
         histories.value = data;
         // 진행 중인 항목만 필터링
         const runningItems = data.filter((item) => item.status === "running");
 
-        // 진행 중인 항목이 있으면 폴링 시작 (3초마다 업데이트)
+        // 실행 중인 항목 있으면 폴링 시작
         if (runningItems.length > 0) {
             stopPolling.value = pollRunningItems(
                 runningItems.map((item) => item.id),
@@ -88,12 +84,12 @@ const loadHistories = async () => {
     }
 };
 
-// 컴포넌트가 마운트되면 데이터 로드 시작
+// 마운트 시 데이터 로드
 onMounted(() => {
     loadHistories();
 });
 
-// 컴포넌트가 언마운트되면 폴링 정리
+// 언마운트 시 폴링 정리
 onUnmounted(() => {
     if (stopPolling.value) {
         stopPolling.value();
@@ -107,7 +103,7 @@ const handleRefresh = () => {
     loadHistories();
 };
 
-// (추후) 필터 UI를 열기 위한 핸들러입니다.
+// 필터 핸들러 (추후 구현)
 const handleFilter = () => {
     console.log("필터 버튼 클릭");
 };
@@ -153,7 +149,7 @@ const formatDate = (value?: string | null) => {
     return d.toLocaleString();
 };
 
-// duration 값을 UI 표시용으로 포맷합니다.
+// Duration 포맷팅 (PT1M18S -> 1m 18s)
 const formatDuration = (value?: string | null) => {
     if (!value) return "-";
 
@@ -178,7 +174,7 @@ const formatDuration = (value?: string | null) => {
     }
 };
 
-// 로그 패널을 닫고 관련 상태를 초기화합니다.
+// 로그 패널 닫기 및 초기화
 const closeHistoryDetail = () => {
     detailRequestSeq.value += 1;
     selectedHistoryId.value = null;
@@ -187,7 +183,7 @@ const closeHistoryDetail = () => {
     detailError.value = null;
 };
 
-// 선택된 히스토리의 상세(로그)를 토글/조회합니다.
+// 히스토리 상세(로그) 토글/조회
 const handleHistoryClick = async (id: number) => {
     if (selectedHistoryId.value === id) {
         closeHistoryDetail();
@@ -217,7 +213,7 @@ const handleHistoryClick = async (id: number) => {
     }
 };
 
-// 작업을 중단합니다.
+// 작업 중단 요청
 const handleCancel = async (id: number) => {
     if (!confirm("정말로 작업을 중단하시겠습니까?")) return;
 
@@ -230,7 +226,7 @@ const handleCancel = async (id: number) => {
         alert("작업 중단에 실패했습니다.");
     }
 };
-// 작업을 재시도합니다.
+// 작업 재시도 요청
 const handleRetry = async (id: number) => {
     if (
         !confirm(
