@@ -1,16 +1,30 @@
-<script setup>
+<script setup lang="ts">
 import {ref, computed} from "vue";
 import {useRouter} from "vue-router";
 
+import Table, {type Column} from "../components/Table.vue";
+
 const router = useRouter();
 
-// TC 상세 이동
-const goToTestCaseDetail = (testCaseId) => {
+// TC 상세 이동 (Table row-click)
+const handleRowClick = (item: any) => {
     router.push({
         name: "TestCaseDetail",
-        params: {id: testCaseId},
+        params: {id: item.id},
     });
 };
+
+// 테이블 컬럼 정의
+const columns: Column[] = [
+    {key: "id", label: "TC ID", width: "w-24"},
+    {key: "function", label: "기능", width: "w-24"},
+    {key: "title", label: "타이틀"},
+    {key: "priority", label: "중요도", width: "w-24"},
+    {key: "createdAt", label: "작성일", width: "w-32"},
+    {key: "updatedAt", label: "최근 수정일", width: "w-32"},
+    {key: "status", label: "검증 결과", width: "w-28", align: "center"},
+];
+
 // 샘플 데이터
 const testCases = ref([
     {
@@ -63,6 +77,7 @@ const testCases = ref([
 const projects = ref(["SKT Agent Bench", "T-Gen", "Samsung VOC"]);
 const selectedProject = ref("SKT Agent Bench");
 const searchQuery = ref("");
+const itemsPerPage = ref(10);
 
 // 검색 필터링된 TC 목록
 const filteredTestCases = computed(() => {
@@ -80,13 +95,17 @@ const filteredTestCases = computed(() => {
 });
 
 // 날짜 포맷팅
-const formatDate = (dateString) => {
-    const options = {year: "numeric", month: "2-digit", day: "2-digit"};
+const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    };
     return new Date(dateString).toLocaleDateString("ko-KR", options);
 };
 
 // 상태 버튼 클릭 핸들러 (Cycle)
-const handleStatusClick = (testCase) => {
+const handleStatusClick = (testCase: any) => {
     // Cycle through statuses: approved -> ai -> rejected -> approved
     const statusOrder = ["approved", "ai", "rejected"];
     const currentIndex = statusOrder.indexOf(testCase.status);
@@ -99,20 +118,19 @@ const filterByProject = () => {
     // Add your project filtering logic here
     console.log("Filtering by project:", selectedProject.value);
 };
-
-// 검색 필터링 (Computed에서 처리)
-const filterTestCases = () => {
-    // Search is handled by the computed property
-};
 </script>
 
 <template>
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
-        <header>
-            <p class="mt-1 text-sm text-gray-500">
-                생성된 테스트케이스를 확인하고 관리할 수 있습니다.
-            </p>
+        <header
+            class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+        >
+            <div>
+                <p class="mt-1 text-sm text-gray-500">
+                    생성된 테스트케이스를 확인하고 관리할 수 있습니다.
+                </p>
+            </div>
         </header>
 
         <!-- 메인 카드 -->
@@ -132,7 +150,6 @@ const filterTestCases = () => {
                             v-model="searchQuery"
                             class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="테스트케이스 검색"
-                            @input="filterTestCases"
                         />
                     </div>
                 </div>
@@ -158,80 +175,75 @@ const filterTestCases = () => {
             </div>
 
             <!-- 테이블 영역 -->
-            <div class="overflow-x-auto">
-                <table class="table-container">
-                    <thead class="table-header">
-                        <tr>
-                            <th class="table-header-cell">TC ID</th>
-                            <th class="table-header-cell">기능</th>
-                            <th class="table-header-cell">타이틀</th>
-                            <th class="table-header-cell">중요도</th>
-                            <th class="table-header-cell">작성일</th>
-                            <th class="table-header-cell">최근 수정일</th>
-                            <th class="table-header-cell text-center">
-                                검증 결과
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="table-body">
-                        <tr
-                            v-for="testCase in filteredTestCases"
-                            :key="testCase.id"
-                            class="table-row cursor-pointer"
-                            @click="goToTestCaseDetail(testCase.id)"
-                        >
-                            <td class="table-cell text-gray-500">
-                                {{ testCase.id }}
-                            </td>
-                            <td class="table-cell text-gray-500">
-                                {{ testCase.function }}
-                            </td>
-                            <td class="table-cell font-medium text-gray-900">
-                                {{ testCase.title }}
-                            </td>
-                            <td class="table-cell">
-                                <span
-                                    :class="`priority-tag ${
-                                        testCase.priority === 'High'
-                                            ? 'priority-high'
-                                            : testCase.priority === 'Medium'
-                                            ? 'priority-medium'
-                                            : 'priority-low'
-                                    }`"
-                                >
-                                    {{ testCase.priority }}
-                                </span>
-                            </td>
-                            <td class="table-cell text-gray-500">
-                                {{ formatDate(testCase.createdAt) }}
-                            </td>
-                            <td class="table-cell text-gray-500">
-                                {{ formatDate(testCase.updatedAt) }}
-                            </td>
-                            <td class="table-cell text-center">
-                                <button
-                                    @click.stop="handleStatusClick(testCase)"
-                                    :class="`status-badge ${
-                                        testCase.status === 'approved'
-                                            ? 'status-approved'
-                                            : testCase.status === 'ai'
-                                            ? 'status-ai'
-                                            : 'status-rejected'
-                                    }`"
-                                >
-                                    {{
-                                        testCase.status === "approved"
-                                            ? "사용"
-                                            : testCase.status === "ai"
-                                            ? "AI 생성"
-                                            : "미사용"
-                                    }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <Table
+                :columns="columns"
+                :data="filteredTestCases"
+                v-model:items-per-page="itemsPerPage"
+                pagination-mode="client"
+                @row-click="handleRowClick"
+            >
+                <!-- TC ID -->
+                <template #cell-id="{value}">
+                    <span class="text-gray-500">{{ value }}</span>
+                </template>
+
+                <!-- 기능 -->
+                <template #cell-function="{value}">
+                    <span class="text-gray-500">{{ value }}</span>
+                </template>
+
+                <!-- 타이틀 -->
+                <template #cell-title="{value}">
+                    <span class="font-medium text-gray-900">{{ value }}</span>
+                </template>
+
+                <!-- 중요도 -->
+                <template #cell-priority="{value}">
+                    <span
+                        :class="`priority-tag ${
+                            value === 'High'
+                                ? 'priority-high'
+                                : value === 'Medium'
+                                ? 'priority-medium'
+                                : 'priority-low'
+                        }`"
+                    >
+                        {{ value }}
+                    </span>
+                </template>
+
+                <!-- 작성일 -->
+                <template #cell-createdAt="{value}">
+                    <span class="text-gray-500">{{ formatDate(value) }}</span>
+                </template>
+
+                <!-- 수정일 -->
+                <template #cell-updatedAt="{value}">
+                    <span class="text-gray-500">{{ formatDate(value) }}</span>
+                </template>
+
+                <!-- 상태 (Verification Result in UI) -->
+                <template #cell-status="{value, item}">
+                    <button
+                        @click.stop="handleStatusClick(item)"
+                        :class="`status-badge ${
+                            value === 'approved'
+                                ? 'status-approved'
+                                : value === 'ai'
+                                ? 'status-ai'
+                                : 'status-rejected'
+                        }`"
+                    >
+                        {{
+                            value === "approved"
+                                ? "사용"
+                                : value === "ai"
+                                ? "AI 생성"
+                                : "미사용"
+                        }}
+                    </button>
+                </template>
+            </Table>
         </section>
     </main>
 </template>

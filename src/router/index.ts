@@ -4,7 +4,6 @@ import Project from "../views/Project.vue";
 import ProjectCreate from "../views/ProjectCreate.vue";
 import GenerateHistory from "../views/GenerateHistory.vue";
 import GenerateCreate from "../views/GenerateCreate.vue";
-import RagTest from "../views/RagTest.vue";
 import TestCase from "../views/TestCase.vue";
 import TestCaseDetail from "../views/TestCaseDetail.vue";
 import ProjectDetail from "../views/ProjectDetail.vue";
@@ -51,11 +50,6 @@ const routes: Array<RouteRecordRaw> = [
         name: "TestCaseDetail",
         component: TestCaseDetail,
         props: true,
-    },
-    {
-        path: "/test",
-        name: "test",
-        component: RagTest,
     },
     {
         path: "/setting",

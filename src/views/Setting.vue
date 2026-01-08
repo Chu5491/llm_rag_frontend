@@ -139,10 +139,9 @@ onMounted(() => {
     <main class="space-y-6 p-6">
         <!-- Header -->
         <header
-            class="flex flex-col justify-between gap-4 md:flex-row md:items-start"
+            class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
         >
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">환경설정</h2>
                 <p class="mt-1 text-sm text-gray-500">
                     프로젝트 및 환경별 생성 옵션과 외부 연동을 관리합니다.
                 </p>

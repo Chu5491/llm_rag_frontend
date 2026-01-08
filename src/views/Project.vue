@@ -3,6 +3,7 @@ import {ref, onMounted} from "vue";
 import {useRouter} from "vue-router";
 import {fetchProjects} from "../services/projectApi.js";
 import type {ProjectResponse} from "../types/project.js";
+import Table, {type Column} from "../components/Table.vue";
 
 const router = useRouter();
 
@@ -10,13 +11,31 @@ const router = useRouter();
 const projects = ref<ProjectResponse[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+const itemsPerPage = ref(10);
 
-// 데이터 로드
+// 테이블 컬럼 정의
+const tableColumns: Column[] = [
+    {key: "id", label: "ID", width: "w-16", align: "center", sortable: true},
+    {key: "name", label: "프로젝트명", width: "w-48", sortable: true},
+    {key: "service_type", label: "서비스 유형", sortable: true},
+    {key: "description", label: "설명", sortable: false},
+    {
+        key: "tc_count",
+        label: "생성 TC 건 수",
+        width: "w-32",
+        align: "center",
+        sortable: true,
+    },
+];
+
+// 데이터 로드 (전체 로드)
 const loadProjects = async () => {
     isLoading.value = true;
     error.value = null;
     try {
-        projects.value = await fetchProjects();
+        // LIMIT 1000으로 설정하여 사실상 전체 데이터를 가져옴
+        const data = await fetchProjects(0, 1000);
+        projects.value = data;
     } catch (e: any) {
         console.error("프로젝트 로드 실패:", e);
         error.value = "프로젝트 목록을 불러오는 데 실패했습니다.";
@@ -30,9 +49,9 @@ const formatNumber = (num: number) => {
     return new Intl.NumberFormat().format(num);
 };
 
-// 상세 페이지 이동
-const navigateToProject = (id: number) => {
-    router.push(`/project/detail/${id}`);
+// 상세 페이지 이동 (Table row-click 이벤트 핸들러)
+const handleRowClick = (item: any) => {
+    router.push(`/project/detail/${item.id}`);
 };
 
 // 초기 로드
@@ -45,7 +64,9 @@ onMounted(() => {
     <!-- 대시보드 메인 래퍼 -->
     <main class="p-6 space-y-6">
         <!-- 페이지 헤더 -->
-        <header class="flex items-center justify-between">
+        <header
+            class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+        >
             <div>
                 <p class="mt-1 text-sm text-gray-500">
                     생성된 프로젝트의 목록을 조회합니다.
@@ -91,72 +112,38 @@ onMounted(() => {
                 </button>
             </div>
 
-            <!-- 프로젝트 목록 없는 경우 -->
-            <div
-                v-else-if="projects.length === 0"
-                class="flex flex-col items-center justify-center py-20"
-            >
-                <span class="material-icons-outlined text-4xl text-gray-300"
-                    >folder_off</span
-                >
-                <p class="mt-2 text-sm text-gray-500">
-                    등록된 프로젝트가 없습니다.
-                </p>
-            </div>
-
             <!-- 프로젝트 목록 테이블 -->
-            <div
+            <Table
                 v-else
-                class="overflow-x-auto rounded-lg border border-gray-100 bg-white"
+                :columns="tableColumns"
+                :data="projects"
+                v-model:items-per-page="itemsPerPage"
+                pagination-mode="client"
+                @row-click="handleRowClick"
             >
-                <table class="table-container">
-                    <thead class="table-header">
-                        <tr>
-                            <th class="w-10 table-header-cell">ID</th>
-                            <th class="w-48 table-header-cell">프로젝트명</th>
-                            <th class="table-header-cell">서비스 유형</th>
-                            <th class="table-header-cell">설명</th>
-                            <th class="w-32 table-header-cell text-center">
-                                생성 TC 건 수
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="table-body">
-                        <tr
-                            v-for="project in projects"
-                            :key="project.id"
-                            class="table-row cursor-pointer hover:bg-gray-50 transition-colors"
-                            @click="navigateToProject(project.id)"
-                        >
-                            <td class="table-cell text-center text-gray-500">
-                                {{ project.id }}
-                            </td>
-                            <td class="table-cell">
-                                <code class="text-xs font-mono text-indigo-600">
-                                    {{ project.name }}
-                                </code>
-                            </td>
-                            <td class="table-cell">
-                                <span
-                                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
-                                >
-                                    {{ project.service_type }}
-                                </span>
-                            </td>
-                            <td
-                                class="table-cell text-gray-700 truncate max-w-xs"
-                            >
-                                {{ project.description }}
-                            </td>
-                            <td class="table-cell text-center">
-                                <span class="badge badge-green">
-                                    {{ formatNumber(project.tc_count) }}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                <template #cell-name="{value}">
+                    <code class="text-xs font-mono text-indigo-600">
+                        {{ value }}
+                    </code>
+                </template>
+                <template #cell-service_type="{value}">
+                    <span
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
+                    >
+                        {{ value }}
+                    </span>
+                </template>
+                <template #cell-description="{value}">
+                    <div class="truncate max-w-xs" :title="value">
+                        {{ value }}
+                    </div>
+                </template>
+                <template #cell-tc_count="{value}">
+                    <span class="badge badge-green">
+                        {{ formatNumber(value) }}
+                    </span>
+                </template>
+            </Table>
         </section>
     </main>
 </template>

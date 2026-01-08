@@ -12,7 +12,6 @@ const navItems = [
     {path: "/project", name: "프로젝트 관리", icon: "folder"},
     {path: "/generate", name: "TC 자동생성", icon: "auto_awesome"},
     {path: "/testcase", name: "TC 관리", icon: "list_alt"},
-    {path: "/test", name: "생성 테스트", icon: "science"},
     {path: "/setting", name: "환경설정", icon: "settings"},
 ];
 

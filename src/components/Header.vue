@@ -16,7 +16,6 @@ const pageTitle = computed(() => {
         ProjectCreate: "프로젝트 등록",
         TestCase: "테스트케이스 관리",
         TestCaseDetail: "테스트케이스 상세 정보",
-        RagTest: "QA 테스트케이스 생성",
         GenerateCreate: "테스트케이스 자동생성 실행",
         GenerateHistory: "자동생성 히스토리",
         test: "TC 생성 테스트",
