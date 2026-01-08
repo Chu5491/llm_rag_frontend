@@ -69,7 +69,7 @@ export async function fetchHistories(): Promise<GenerationItem[]> {
 export async function fetchHistoryDetail(
     id: number
 ): Promise<HistoryDetailResponse> {
-    const res = await fetch(`/api/v1/history/${id}`);
+    const res = await fetch(`/api/v1/history/${id}?polling=true`);
     if (!res.ok) {
         throw new Error("히스토리 상세 정보 조회에 실패했습니다.");
     }
