@@ -1,101 +1,58 @@
 <script setup lang="ts">
-import {ref, computed} from "vue";
+import {ref, computed, onMounted} from "vue";
 import {useRouter} from "vue-router";
+import {getTestCaseList, fetchProjects} from "../services/api.js";
+import type {TestcaseResponse} from "../types/testcase.js";
+import type {ProjectResponse} from "../types/project.js";
 
 import Table, {type Column} from "../components/Table.vue";
 
 const router = useRouter();
 
 // TC 상세 이동 (Table row-click)
-const handleRowClick = (item: any) => {
+const handleRowClick = (item: TestcaseResponse) => {
     router.push({
         name: "TestCaseDetail",
         params: {id: item.id},
     });
 };
 
-// 테이블 컬럼 정의
+// 테이블 컬럼 정의 (API 스키마 매핑)
 const columns: Column[] = [
-    {key: "id", label: "TC ID", width: "w-24"},
-    {key: "function", label: "기능", width: "w-24"},
+    {key: "testcase_id_tag", label: "TC ID", width: "w-24"},
+    {key: "module", label: "기능", width: "w-32"},
     {key: "title", label: "타이틀"},
     {key: "priority", label: "중요도", width: "w-24"},
-    {key: "createdAt", label: "작성일", width: "w-32"},
-    {key: "updatedAt", label: "최근 수정일", width: "w-32"},
-    {key: "status", label: "검증 결과", width: "w-28", align: "center"},
+    {key: "created_at", label: "작성일", width: "w-32"},
+    {key: "updated_at", label: "최근 수정일", width: "w-32"},
+    {key: "status", label: "상태", width: "w-28", align: "center"},
 ];
 
-// 샘플 데이터
-const testCases = ref([
-    {
-        id: "TC-001",
-        function: "Login",
-        title: "Valid Credential Login",
-        priority: "High",
-        createdAt: "2023-10-25",
-        updatedAt: "2023-10-27",
-        status: "approved",
-    },
-    {
-        id: "TC-002",
-        function: "Login",
-        title: "Invalid Password Check",
-        priority: "High",
-        createdAt: "2023-10-25",
-        updatedAt: "2023-10-26",
-        status: "ai",
-    },
-    {
-        id: "TC-003",
-        function: "Payment",
-        title: "Legacy Gateway Timeout",
-        priority: "Medium",
-        createdAt: "2023-10-20",
-        updatedAt: "2023-10-21",
-        status: "rejected",
-    },
-    {
-        id: "TC-004",
-        function: "Search",
-        title: "Empty Query Behavior",
-        priority: "Low",
-        createdAt: "2023-10-28",
-        updatedAt: "2023-10-28",
-        status: "approved",
-    },
-    {
-        id: "TC-005",
-        function: "Profile",
-        title: "Image Upload Format Check",
-        priority: "Medium",
-        createdAt: "2023-10-22",
-        updatedAt: "2023-10-24",
-        status: "approved",
-    },
-]);
-
-const projects = ref(["SKT Agent Bench", "T-Gen", "Samsung VOC"]);
-const selectedProject = ref("SKT Agent Bench");
+// 데이터 상태
+const testCases = ref<TestcaseResponse[]>([]);
+const projects = ref<ProjectResponse[]>([]);
+const selectedProjectId = ref<number | null>(null);
 const searchQuery = ref("");
 const itemsPerPage = ref(10);
+const isLoading = ref(false);
 
 // 검색 필터링된 TC 목록
 const filteredTestCases = computed(() => {
-    return testCases.value.filter((testCase) => {
+    if (!testCases.value) return [];
+
+    return testCases.value.filter((testCase: TestcaseResponse) => {
+        const query = searchQuery.value.toLowerCase();
         const matchesSearch =
-            testCase.title
-                .toLowerCase()
-                .includes(searchQuery.value.toLowerCase()) ||
-            testCase.function
-                .toLowerCase()
-                .includes(searchQuery.value.toLowerCase()) ||
-            testCase.id.toLowerCase().includes(searchQuery.value.toLowerCase());
+            testCase.title.toLowerCase().includes(query) ||
+            testCase.module.toLowerCase().includes(query) ||
+            testCase.id.toString().includes(query);
         return matchesSearch;
     });
 });
 
 // 날짜 포맷팅
 const formatDate = (dateString: string) => {
+    if (!dateString) return "-";
     const options: Intl.DateTimeFormatOptions = {
         year: "numeric",
         month: "2-digit",
@@ -104,20 +61,48 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR", options);
 };
 
-// 상태 버튼 클릭 핸들러 (Cycle)
-const handleStatusClick = (testCase: any) => {
-    // Cycle through statuses: approved -> ai -> rejected -> approved
-    const statusOrder = ["approved", "ai", "rejected"];
-    const currentIndex = statusOrder.indexOf(testCase.status);
-    const nextIndex = (currentIndex + 1) % statusOrder.length;
-    testCase.status = statusOrder[nextIndex];
+// 데이터 로드
+const loadProjects = async () => {
+    try {
+        const list = await fetchProjects();
+        projects.value = list;
+        // 기본 프로젝트 선택 (첫번째)
+        if (list.length > 0) {
+            selectedProjectId.value = list[0].id;
+            await loadTestCases();
+        }
+    } catch (error) {
+        console.error("프로젝트 목록 로드 실패:", error);
+    }
 };
 
-// 프로젝트별 필터링
-const filterByProject = () => {
-    // Add your project filtering logic here
-    console.log("Filtering by project:", selectedProject.value);
+const loadTestCases = async () => {
+    if (!selectedProjectId.value) return;
+
+    isLoading.value = true;
+    try {
+        // 전체 목록 조회 (클라이언트 페이지네이션 사용)
+        const list = await getTestCaseList({
+            project_id: selectedProjectId.value,
+            limit: 1000, // 충분히 큰 수
+        });
+        testCases.value = list;
+    } catch (error) {
+        console.error("테스트케이스 목록 로드 실패:", error);
+    } finally {
+        isLoading.value = false;
+    }
 };
+
+// 프로젝트 변경 핸들러
+const handleProjectChange = () => {
+    loadTestCases();
+};
+
+// 초기화
+onMounted(() => {
+    loadProjects();
+});
 </script>
 
 <template>
@@ -127,6 +112,9 @@ const filterByProject = () => {
             class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
         >
             <div>
+                <h1 class="text-2xl font-bold text-gray-900">
+                    테스트케이스 관리
+                </h1>
                 <p class="mt-1 text-sm text-gray-500">
                     생성된 테스트케이스를 확인하고 관리할 수 있습니다.
                 </p>
@@ -149,7 +137,7 @@ const filterByProject = () => {
                         <input
                             v-model="searchQuery"
                             class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="테스트케이스 검색"
+                            placeholder="테스트케이스 검색 (제목, 기능, ID)"
                         />
                     </div>
                 </div>
@@ -159,16 +147,16 @@ const filterByProject = () => {
                         >프로젝트 필터</label
                     >
                     <select
-                        v-model="selectedProject"
+                        v-model="selectedProjectId"
                         class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        @change="filterByProject"
+                        @change="handleProjectChange"
                     >
                         <option
                             v-for="project in projects"
-                            :key="project"
-                            :value="project"
+                            :key="project.id"
+                            :value="project.id"
                         >
-                            {{ project }}
+                            {{ project.name }}
                         </option>
                     </select>
                 </div>
@@ -183,13 +171,19 @@ const filterByProject = () => {
                 @row-click="handleRowClick"
             >
                 <!-- TC ID -->
-                <template #cell-id="{value}">
-                    <span class="text-gray-500">{{ value }}</span>
+                <template #cell-testcase_id_tag="{value}">
+                    <span class="font-mono text-gray-500 text-xs">{{
+                        value
+                    }}</span>
                 </template>
 
-                <!-- 기능 -->
-                <template #cell-function="{value}">
-                    <span class="text-gray-500">{{ value }}</span>
+                <!-- 기능 (Module) -->
+                <template #cell-module="{value}">
+                    <span
+                        class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                    >
+                        {{ value }}
+                    </span>
                 </template>
 
                 <!-- 타이틀 -->
@@ -200,48 +194,71 @@ const filterByProject = () => {
                 <!-- 중요도 -->
                 <template #cell-priority="{value}">
                     <span
-                        :class="`priority-tag ${
-                            value === 'High'
-                                ? 'priority-high'
-                                : value === 'Medium'
-                                ? 'priority-medium'
-                                : 'priority-low'
-                        }`"
+                        v-if="value"
+                        class="px-2 py-0.5 rounded text-xs font-medium"
+                        :class="{
+                            'bg-red-100 text-red-700': value === 'High',
+                            'bg-yellow-100 text-yellow-800': value === 'Medium',
+                            'bg-gray-100 text-gray-700': value === 'Low',
+                        }"
                     >
                         {{ value }}
                     </span>
+                    <span v-else class="text-gray-400 text-xs">-</span>
                 </template>
 
                 <!-- 작성일 -->
-                <template #cell-createdAt="{value}">
-                    <span class="text-gray-500">{{ formatDate(value) }}</span>
+                <template #cell-created_at="{value}">
+                    <span class="text-gray-500 text-sm">{{
+                        formatDate(value)
+                    }}</span>
                 </template>
 
                 <!-- 수정일 -->
-                <template #cell-updatedAt="{value}">
-                    <span class="text-gray-500">{{ formatDate(value) }}</span>
+                <template #cell-updated_at="{value}">
+                    <span class="text-gray-500 text-sm">{{
+                        formatDate(value)
+                    }}</span>
                 </template>
 
-                <!-- 상태 (Verification Result in UI) -->
-                <template #cell-status="{value, item}">
-                    <button
-                        @click.stop="handleStatusClick(item)"
-                        :class="`status-badge ${
-                            value === 'approved'
-                                ? 'status-approved'
-                                : value === 'ai'
-                                ? 'status-ai'
-                                : 'status-rejected'
-                        }`"
+                <!-- 상태 (status) -->
+                <template #cell-status="{value}">
+                    <span
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                        :class="{
+                            'bg-green-50 text-green-700': value === 'active',
+                            'bg-blue-50 text-blue-700': value === 'generated',
+                            'bg-gray-100 text-gray-600':
+                                value !== 'active' && value !== 'generated',
+                        }"
                     >
+                        <span
+                            class="w-1.5 h-1.5 rounded-full"
+                            :class="{
+                                'bg-green-500': value === 'active',
+                                'bg-blue-500': value === 'generated',
+                                'bg-gray-400':
+                                    value !== 'active' && value !== 'generated',
+                            }"
+                        ></span>
                         {{
-                            value === "approved"
-                                ? "사용"
-                                : value === "ai"
-                                ? "AI 생성"
-                                : "미사용"
+                            value === "active"
+                                ? "Active"
+                                : value === "generated"
+                                ? "Generated"
+                                : value === "inactive"
+                                ? "Inactive"
+                                : value
                         }}
-                    </button>
+                    </span>
+                </template>
+
+                <!-- 데이터 없음 (로딩 중이 아니고 데이터가 0일 때) -->
+                <template #empty>
+                    <div class="py-12 text-center text-gray-500">
+                        <p v-if="isLoading">데이터를 불러오는 중입니다...</p>
+                        <p v-else>표시할 테스트케이스가 없습니다.</p>
+                    </div>
                 </template>
             </Table>
         </section>
@@ -249,5 +266,5 @@ const filterByProject = () => {
 </template>
 
 <style scoped>
-/* Add any component-specific styles here */
+/* Scoped styles removed as Tailwind is used */
 </style>

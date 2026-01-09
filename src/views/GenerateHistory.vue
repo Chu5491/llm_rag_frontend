@@ -1,5 +1,6 @@
+```
 <script setup lang="ts">
-import {ref, onMounted, onUnmounted, computed} from "vue";
+import {ref, computed, onMounted, onUnmounted, watch} from "vue";
 import {
     fetchHistories,
     fetchHistoryDetail,
@@ -35,6 +36,8 @@ const selectedStatus = ref<"all" | GenerationStatus>("all"); // 상태 필터
 const selectedProjectId = ref<number | "all">("all"); // 프로젝트 필터
 const projects = ref<ProjectResponse[]>([]); // 프로젝트 목록
 const isFilterOpen = ref(false); // 필터 팝업 표시
+const detailMode = ref<"logs" | "report" | null>(null); // 상세 표시 모드
+const displayLimit = ref(5); // 현재 표시할 항목 수
 
 const dateRange = ref({start: "", end: ""}); // 날짜 필터 (Default: 전체)
 
@@ -97,6 +100,64 @@ const filteredHistories = computed(() => {
     return result;
 });
 
+// 추가 보기 관련
+const hasMore = computed(() => {
+    return filteredHistories.value.length > displayLimit.value;
+});
+
+const loadMore = () => {
+    displayLimit.value += 5;
+};
+
+// 필터 변경 시 표시 제한 초기화
+watch(
+    [searchQuery, selectedStatus, selectedProjectId, dateRange],
+    () => {
+        displayLimit.value = 5;
+    },
+    {deep: true}
+);
+
+// 리포트 통계 계산
+const reportStats = computed(() => {
+    if (
+        !selectedHistory.value?.result_data ||
+        !Array.isArray(selectedHistory.value.result_data)
+    ) {
+        return null;
+    }
+
+    const data = selectedHistory.value.result_data;
+    const total = data.length;
+
+    // 우선순위 분포
+    const priorityCounts: Record<string, number> = {
+        High: 0,
+        Medium: 0,
+        Low: 0,
+    };
+
+    // 기능(모듈) 분포
+    const moduleCounts: Record<string, number> = {};
+
+    data.forEach((item: any) => {
+        // 우선순위 집계
+        if (item.priority in priorityCounts) {
+            priorityCounts[item.priority]++;
+        }
+
+        // 기능 집계
+        const mod = item.module || "기타";
+        moduleCounts[mod] = (moduleCounts[mod] || 0) + 1;
+    });
+
+    return {
+        total,
+        priorityCounts,
+        moduleCounts: Object.entries(moduleCounts).sort((a, b) => b[1] - a[1]), // 개수 많은 순 정렬
+    };
+});
+
 // 진행 중인 항목 상태 업데이트 (불변성 유지)
 const updateRunningItems = (details: HistoryDetailResponse[]) => {
     details.forEach((detail) => {
@@ -128,6 +189,7 @@ const loadHistories = async () => {
         detailRequestSeq.value += 1;
         selectedHistoryId.value = null;
         selectedHistory.value = null;
+        detailMode.value = null;
         isDetailLoading.value = false;
         detailError.value = null;
 
@@ -189,6 +251,9 @@ const groupedHistories = computed(() => {
             new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
     );
 
+    // 표시 제한 적용
+    const sliced = sorted.slice(0, displayLimit.value);
+
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
@@ -198,7 +263,7 @@ const groupedHistories = computed(() => {
         d1.getMonth() === d2.getMonth() &&
         d1.getDate() === d2.getDate();
 
-    sorted.forEach((item) => {
+    sliced.forEach((item) => {
         const itemDate = new Date(item.started_at);
         let label = "";
 
@@ -282,16 +347,26 @@ const getProjectName = (projectId: number) => {
 const closeHistoryDetail = () => {
     selectedHistoryId.value = null;
     selectedHistory.value = null;
+    detailMode.value = null;
 };
 
-// 상세 토글
-const handleHistoryClick = async (id: number) => {
-    if (selectedHistoryId.value === id) {
+// 상세 토글 (id와 mode를 받아 처리)
+const handleHistoryClick = async (
+    id: number,
+    mode: "logs" | "report" = "logs"
+) => {
+    // 이미 같은 항목의 같은 모드가 열려있으면 닫기
+    if (selectedHistoryId.value === id && detailMode.value === mode) {
         closeHistoryDetail();
         return;
     }
 
+    // 항목은 같으나 모드가 다르면 모드만 변경 (데이터는 이미 있으므로 로딩 불필요할 수도 있으나 안전하게 재호출 가능)
+    const isSameItemDifferentMode =
+        selectedHistoryId.value === id && detailMode.value !== mode;
+
     selectedHistoryId.value = id;
+    detailMode.value = mode;
     const seq = ++detailRequestSeq.value;
     isDetailLoading.value = true;
     detailError.value = null;
@@ -662,16 +737,18 @@ const historyDetailColumns: Column[] = [
                                         </span>
                                     </div>
 
-                                    <div class="flex items-center gap-24 mb-3">
+                                    <div class="flex items-center gap-4 mb-3">
                                         <!-- Model Badge -->
                                         <div
-                                            class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded text-xs text-gray-600 font-mono shrink-0"
+                                            class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded text-xs text-gray-600 font-mono shrink-0 w-36"
                                         >
                                             <span
-                                                class="material-icons-outlined text-[14px]"
+                                                class="material-icons-outlined text-[14px] shrink-0"
                                                 >smart_toy</span
                                             >
-                                            {{ item.model_name }}
+                                            <span class="truncate">{{
+                                                item.model_name
+                                            }}</span>
                                         </div>
 
                                         <!-- Progress Bar (Running Only - Inline) -->
@@ -701,9 +778,15 @@ const historyDetailColumns: Column[] = [
                                     <div
                                         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2 mt-2"
                                     >
-                                        <div class="flex flex-col">
+                                        <div class="flex flex-col min-w-0">
                                             <span
-                                                class="text-xs text-gray-400 font-medium uppercase"
+                                                class="text-xs text-gray-400 font-medium uppercase truncate block"
+                                                :title="
+                                                    item.status === 'failed' ||
+                                                    item.status === 'cancelled'
+                                                        ? 'Result Note'
+                                                        : 'Generated TC Count'
+                                                "
                                             >
                                                 {{
                                                     item.status === "failed" ||
@@ -757,16 +840,24 @@ const historyDetailColumns: Column[] = [
 
                             <!-- 우측: 액션 -->
                             <div class="shrink-0 flex items-start gap-2 pt-1">
+                                <!-- 로그 버튼 (실행 중이 아닐 때만 표시) -->
                                 <button
-                                    @click="handleHistoryClick(item.id)"
+                                    v-if="item.status !== 'running'"
+                                    @click="handleHistoryClick(item.id, 'logs')"
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                                    :class="{
+                                        'ring-2 ring-indigo-500 border-indigo-500':
+                                            selectedHistoryId === item.id &&
+                                            detailMode === 'logs',
+                                    }"
                                 >
                                     <span
                                         class="material-icons-outlined text-lg"
                                         >description</span
                                     >
                                     {{
-                                        selectedHistoryId === item.id
+                                        selectedHistoryId === item.id &&
+                                        detailMode === "logs"
                                             ? "Hide Logs"
                                             : "Show Logs"
                                     }}
@@ -774,7 +865,15 @@ const historyDetailColumns: Column[] = [
 
                                 <button
                                     v-if="item.status === 'success'"
+                                    @click="
+                                        handleHistoryClick(item.id, 'report')
+                                    "
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                                    :class="{
+                                        'ring-2 ring-indigo-500 border-indigo-500':
+                                            selectedHistoryId === item.id &&
+                                            detailMode === 'report',
+                                    }"
                                 >
                                     <span
                                         class="material-icons-outlined text-lg"
@@ -816,7 +915,11 @@ const historyDetailColumns: Column[] = [
                                 <h3
                                     class="text-base font-semibold text-gray-900"
                                 >
-                                    실행 로그 및 결과
+                                    {{
+                                        detailMode === "report"
+                                            ? "생성 결과 리포트"
+                                            : "실행 로그"
+                                    }}
                                 </h3>
                                 <button
                                     @click="closeHistoryDetail"
@@ -845,6 +948,7 @@ const historyDetailColumns: Column[] = [
                             <div v-else class="space-y-4">
                                 <!-- Logs -->
                                 <div
+                                    v-if="detailMode === 'logs'"
                                     class="bg-gray-900 rounded-md p-4 overflow-x-auto max-h-60 text-xs font-mono text-gray-300 scrollbar-thin scrollbar-thumb-gray-700"
                                 >
                                     <pre
@@ -856,90 +960,163 @@ const historyDetailColumns: Column[] = [
                                     >
                                 </div>
 
-                                <!-- Result Table -->
+                                <!-- Result View -->
                                 <div
                                     v-if="
+                                        detailMode === 'report' &&
                                         selectedHistory?.result_data &&
                                         Array.isArray(
                                             selectedHistory.result_data
                                         )
                                     "
-                                    class="border border-gray-200 rounded-lg overflow-hidden"
+                                    class="space-y-8"
                                 >
-                                    <Table
-                                        :columns="historyDetailColumns"
-                                        :data="selectedHistory.result_data"
-                                        v-model:items-per-page="itemsPerPage"
-                                        pagination-mode="client"
-                                        expandable
-                                        row-key="testcase_id"
+                                    <!-- 요약 통계 그리드 (2컬럼) -->
+                                    <div
+                                        v-if="reportStats"
+                                        class="grid grid-cols-1 md:grid-cols-2 gap-4"
                                     >
-                                        <template #cell-testcase_id="{value}">
-                                            <code
-                                                class="text-xs font-mono text-indigo-600 font-bold bg-indigo-50 px-1 py-0.5 rounded"
-                                                >{{ value }}</code
-                                            >
-                                        </template>
-                                        <template #cell-priority="{value}">
-                                            <span
-                                                class="px-2 py-0.5 rounded text-xs font-medium"
-                                                :class="{
-                                                    'bg-red-100 text-red-700':
-                                                        value === 'High',
-                                                    'bg-yellow-100 text-yellow-800':
-                                                        value === 'Medium',
-                                                    'bg-gray-100 text-gray-700':
-                                                        value === 'Low',
-                                                }"
-                                            >
-                                                {{ value }}
-                                            </span>
-                                        </template>
-                                        <template #expanded-row="{item}">
+                                        <!-- 전체 개수 카드 -->
+                                        <div
+                                            class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-6 flex items-center gap-6 shadow-sm"
+                                        >
                                             <div
-                                                class="grid grid-cols-1 md:grid-cols-2 gap-4 p-2 text-sm text-gray-700"
+                                                class="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner"
                                             >
-                                                <div>
-                                                    <strong
-                                                        class="block text-gray-900 mb-1"
-                                                        >Preconditions:</strong
+                                                <span
+                                                    class="material-icons-outlined text-2xl"
+                                                    >fact_check</span
+                                                >
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-1"
+                                                >
+                                                    전체 테스트케이스 생성
+                                                </p>
+                                                <p
+                                                    class="text-3xl font-black text-indigo-900"
+                                                >
+                                                    {{ reportStats.total }}
+                                                    <span
+                                                        class="text-base font-medium text-indigo-400"
+                                                        >건</span
                                                     >
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <!-- 중요도 분포 카드 -->
+                                        <div
+                                            class="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm"
+                                        >
+                                            <p
+                                                class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-4"
+                                            >
+                                                중요도별 요약
+                                            </p>
+                                            <div
+                                                class="flex items-center divide-x divide-gray-200"
+                                            >
+                                                <div
+                                                    v-for="(
+                                                        count, p
+                                                    ) in reportStats.priorityCounts"
+                                                    :key="p"
+                                                    class="flex-1 text-center px-2"
+                                                >
                                                     <p
-                                                        class="whitespace-pre-line text-gray-600 bg-gray-50 p-2 rounded"
+                                                        class="text-[10px] font-bold mb-1"
+                                                        :class="{
+                                                            'text-red-500':
+                                                                p === 'High',
+                                                            'text-yellow-600':
+                                                                p === 'Medium',
+                                                            'text-gray-400':
+                                                                p === 'Low',
+                                                        }"
                                                     >
-                                                        {{
-                                                            item.preconditions ||
-                                                            "-"
-                                                        }}
+                                                        {{ p }}
+                                                    </p>
+                                                    <p
+                                                        class="text-xl font-bold text-gray-900"
+                                                    >
+                                                        {{ count }}
                                                     </p>
                                                 </div>
-                                                <div>
-                                                    <strong
-                                                        class="block text-gray-900 mb-1"
-                                                        >Steps:</strong
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 기능별 생성 현황 (전체 목록) -->
+                                    <div v-if="reportStats" class="space-y-4">
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                class="w-1.5 h-6 bg-indigo-500 rounded-full"
+                                            ></span>
+                                            <h4
+                                                class="text-base font-bold text-gray-900"
+                                            >
+                                                상세 기능별 생성 분포
+                                            </h4>
+                                        </div>
+
+                                        <div
+                                            class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
+                                        >
+                                            <div
+                                                v-for="[
+                                                    mod,
+                                                    count,
+                                                ] in reportStats.moduleCounts"
+                                                :key="mod"
+                                                class="bg-white border border-gray-100 rounded-lg p-3 hover:border-indigo-200 hover:shadow-sm transition-all"
+                                            >
+                                                <div
+                                                    class="flex flex-col gap-1"
+                                                >
+                                                    <span
+                                                        class="text-xs font-bold text-indigo-600 truncate"
+                                                        :title="mod"
+                                                        >{{ mod }}</span
                                                     >
-                                                    <ul
-                                                        class="list-disc list-inside space-y-1 bg-gray-50 p-2 rounded text-gray-600"
+                                                    <div
+                                                        class="flex items-baseline gap-1"
                                                     >
-                                                        <li
-                                                            v-for="(
-                                                                step, i
-                                                            ) in item.steps"
-                                                            :key="i"
+                                                        <span
+                                                            class="text-lg font-black text-gray-900"
+                                                            >{{ count }}</span
                                                         >
-                                                            {{ step }}
-                                                        </li>
-                                                    </ul>
+                                                        <span
+                                                            class="text-[10px] text-gray-400"
+                                                            >Cases</span
+                                                        >
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </template>
-                                    </Table>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </article>
                 </div>
             </section>
+
+            <!-- 더 보기 버튼 -->
+            <div v-if="hasMore" class="mt-8 mb-12 flex justify-center">
+                <button
+                    @click="loadMore"
+                    class="group relative flex items-center gap-2 px-8 py-3 bg-white border-2 border-indigo-100 rounded-full text-indigo-600 font-semibold hover:border-indigo-500 hover:bg-indigo-50 transition-all shadow-sm"
+                >
+                    <span
+                        class="material-icons-outlined text-lg group-hover:animate-bounce"
+                        >expand_more</span
+                    >
+                    더 보기 ({{ filteredHistories.length - displayLimit }}개
+                    남음)
+                </button>
+            </div>
         </div>
     </main>
 </template>

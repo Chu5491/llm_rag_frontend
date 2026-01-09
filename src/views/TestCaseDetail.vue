@@ -1,39 +1,162 @@
-<script setup>
-import {ref, computed, onMounted} from "vue";
+<script setup lang="ts">
+import {ref, onMounted} from "vue";
 import {useRoute, useRouter} from "vue-router";
 import draggable from "vuedraggable";
+import {
+    getTestCaseDetail,
+    updateTestCase,
+    type TestcaseUpdate,
+} from "../services/testcaseApi.js";
 
-// 폼 데이터
-const formData = ref({
-    id: "TCID-001",
-    function: "로그인",
-    priority: "high",
-    scenario: [
-        {text: "로그인 페이지 접속"},
-        {text: "이메일 입력"},
-        {text: "비밀번호 입력"},
-        {text: "로그인 클릭"},
-        {text: ""},
-    ],
+// --- Types ---
+interface ScenarioStep {
+    text: string;
+}
+
+interface TestCaseForm {
+    id: number;
+    testcase_id_tag: string;
+    module: string;
+    title: string;
+    priority: string;
+    scenario: ScenarioStep[];
+    precondition: string;
+    expectedResult: string;
+    status: string;
+}
+
+const route = useRoute();
+const router = useRouter();
+
+// --- State ---
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+
+const formData = ref<TestCaseForm>({
+    id: 0,
+    testcase_id_tag: "",
+    module: "",
+    title: "",
+    priority: "Low",
+    scenario: [{text: ""}],
     precondition: "",
     expectedResult: "",
-    isVerified: true,
-    comment: "",
+    status: "inactive",
 });
 
-// 버전 히스토리
+// --- Mockup State (History & Comments) ---
+const activeTab = ref("history");
+const newComment = ref("");
+const newReply = ref("");
+const replyingTo = ref<number | null>(null);
+
+// Placeholder Data
 const versionHistory = ref([
     {
-        version: "현재 (v. 10)",
-        date: "2025-08-08 3:06",
-        author: "추경운",
-        comment: "",
+        version: "v1.2",
+        date: "2024-01-10 14:30",
+        author: "김철수",
+        comment: "시나리오 단계 구체화",
     },
-    {version: "v. 9", date: "2025-08-08 3:00", author: "추경운", comment: ""},
-    {version: "v. 8", date: "2025-08-08 2:58", author: "추경운", comment: ""},
-    {version: "v. 7", date: "2025-08-08 2:55", author: "추경운", comment: ""},
-    {version: "v. 6", date: "2025-08-08 2:48", author: "추경운", comment: ""},
+    {
+        version: "v1.1",
+        date: "2024-01-09 11:20",
+        author: "이영희",
+        comment: "기대결과 수정",
+    },
+    {
+        version: "v1.0",
+        date: "2024-01-08 09:00",
+        author: "박지민",
+        comment: "최초 생성",
+    },
 ]);
+
+const comments = ref([
+    {
+        id: 1,
+        author: "박지민",
+        date: "1시간 전",
+        content:
+            "선행조건에 로그인 여부도 포함되어야 할 것 같습니다. 확인 부탁드립니다.",
+        replies: [
+            {
+                id: 101,
+                author: "김철수",
+                date: "30분 전",
+                content: "네, 맞네요. 수정하겠습니다.",
+            },
+        ],
+    },
+]);
+
+// --- Actions : Mockup ---
+const addComment = () => {
+    if (!newComment.value.trim()) return;
+    comments.value.unshift({
+        id: Date.now(),
+        author: "나 (Me)",
+        date: "방금 전",
+        content: newComment.value,
+        replies: [],
+    });
+    newComment.value = "";
+};
+
+const toggleReply = (commentId: number) => {
+    replyingTo.value = replyingTo.value === commentId ? null : commentId;
+    newReply.value = "";
+};
+
+const addReply = (commentId: number) => {
+    if (!newReply.value.trim()) return;
+    const comment = comments.value.find((c) => c.id === commentId);
+    if (comment) {
+        if (!comment.replies) comment.replies = [];
+        comment.replies.push({
+            id: Date.now(),
+            author: "나 (Me)",
+            date: "방금 전",
+            content: newReply.value,
+        });
+    }
+    replyingTo.value = null;
+    newReply.value = "";
+};
+
+// --- Actions : Main ---
+
+// 데이터 조회
+const fetchDetail = async () => {
+    const id = Number(route.params.id);
+    if (!id) return;
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+        const data = await getTestCaseDetail(id);
+        formData.value = {
+            id: data.id,
+            testcase_id_tag: data.testcase_id_tag || `TC-${data.id}`,
+            module: data.module,
+            title: data.title,
+            priority: data.priority || "Low",
+            scenario:
+                data.steps && data.steps.length > 0
+                    ? data.steps.map((s) => ({text: s}))
+                    : [{text: ""}],
+            precondition: data.preconditions || "",
+            expectedResult: data.expected_result,
+            status: data.status,
+        };
+    } catch (err) {
+        console.error("Failed to fetch test case:", err);
+        error.value = "데이터를 불러오는 중 오류가 발생했습니다.";
+    } finally {
+        isLoading.value = false;
+    }
+};
 
 // 시나리오 단계 추가
 const addScenarioStep = () => {
@@ -41,640 +164,579 @@ const addScenarioStep = () => {
 };
 
 // 시나리오 단계 제거
-const removeScenarioStep = (index) => {
+const removeScenarioStep = (index: number) => {
     if (formData.value.scenario.length > 1) {
         formData.value.scenario.splice(index, 1);
     }
 };
 
-const activeTab = ref("comments"); // 개발 중 편의를 위해 comments로 설정 (나중에 history로 변경 가능)
-const newComment = ref("");
-const replyingTo = ref(null); // 현재 답글을 작성 중인 댓글 ID
-const newReply = ref(""); // 답글 입력 내용
+// 폼 제출 (수정)
+const handleSubmit = async () => {
+    if (!formData.value.id) return;
 
-const comments = ref([
-    {
-        id: 1,
-        author: "김담당",
-        content:
-            "시나리오 3번 단계가 명확하지 않습니다. 구체적인 에러 메시지를 기재해주세요.",
-        date: "2025-08-08 14:30",
-        replies: [
-            {
-                id: 101,
-                author: "추경운",
-                content:
-                    "확인했습니다. '로그인 실패' 메시지가 출력되어야 합니다. 수정하겠습니다.",
-                date: "2025-08-08 14:35",
-            },
-        ],
-    },
-    {
-        id: 2,
-        author: "이검수",
-        content: "선행조건에 브라우저 버전 명시가 필요해 보입니다.",
-        date: "2025-08-08 15:00",
-        replies: [],
-    },
-]);
+    if (!confirm("변경사항을 저장하시겠습니까?")) return;
 
-// 새 댓글 등록
-const addComment = () => {
-    if (!newComment.value.trim()) return;
+    try {
+        const updateData: TestcaseUpdate = {
+            module: formData.value.module,
+            title: formData.value.title,
+            priority: formData.value.priority,
+            preconditions: formData.value.precondition,
+            expected_result: formData.value.expectedResult,
+            steps: formData.value.scenario.map((s) => s.text),
+            status: formData.value.status,
+        };
 
-    comments.value.unshift({
-        id: Date.now(),
-        author: "CurrentUser",
-        content: newComment.value,
-        date: new Date().toLocaleString(),
-        replies: [], // 대댓글 배열 초기화
-    });
-    newComment.value = "";
-};
-
-// 답글 모드 토글
-const toggleReply = (commentId) => {
-    if (replyingTo.value === commentId) {
-        replyingTo.value = null;
-        newReply.value = "";
-    } else {
-        replyingTo.value = commentId;
-        newReply.value = "";
+        await updateTestCase(formData.value.id, updateData);
+        alert("저장되었습니다.");
+        router.push({name: "TestCase"});
+    } catch (err) {
+        console.error("Failed to update test case:", err);
+        alert("저장 중 오류가 발생했습니다.");
     }
 };
 
-// 답글 등록
-const addReply = (commentId) => {
-    if (!newReply.value.trim()) return;
-
-    const comment = comments.value.find((c) => c.id === commentId);
-    if (comment) {
-        comment.replies.push({
-            id: Date.now(),
-            author: "CurrentUser",
-            content: newReply.value,
-            date: new Date().toLocaleString(),
-        });
-    }
-
-    replyingTo.value = null;
-    newReply.value = "";
-};
-
-// 폼 제출 핸들러
-const handleSubmit = () => {
-    console.log("Form submitted:", formData.value);
-};
+onMounted(() => {
+    fetchDetail();
+});
 </script>
 
 <template>
     <main class="p-6 space-y-6">
-        <!-- 페이지 헤더 -->
-        <header>
-            <p class="mt-1 text-sm text-gray-500">
-                테스트케이스 상세 등록 정보를 조회합니다.
-            </p>
-        </header>
+        <!-- 로딩/에러 처리 -->
+        <div v-if="isLoading" class="flex justify-center py-20">
+            <div
+                class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"
+            ></div>
+        </div>
+        <div v-else-if="error" class="text-center py-20 text-red-500">
+            {{ error }}
+        </div>
 
-        <!-- 메인 카드 -->
-        <section class="rounded-lg bg-white p-6 shadow">
-            <form class="space-y-8" @submit.prevent="handleSubmit">
-                <!-- 상단: TC ID & 중요도 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <!-- TC ID -->
+        <template v-else>
+            <!-- 페이지 헤더 -->
+            <header>
+                <p class="mt-1 text-sm text-gray-500">
+                    테스트케이스 상세 정보를 조회 및 수정합니다.
+                </p>
+            </header>
+
+            <!-- 메인 카드 -->
+            <section class="rounded-lg bg-white p-6 shadow">
+                <form class="space-y-8" @submit.prevent="handleSubmit">
+                    <!-- 상단: TC ID & 중요도 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <!-- TC ID (Read-only) -->
+                        <div class="space-y-2">
+                            <label
+                                class="block text-sm font-bold text-gray-700"
+                            >
+                                TC ID
+                            </label>
+                            <div class="max-w-md">
+                                <input
+                                    v-model="formData.testcase_id_tag"
+                                    type="text"
+                                    readonly
+                                    class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Priority -->
+                        <div class="space-y-2 flex flex-col items-end">
+                            <label
+                                class="block text-sm font-bold text-gray-700 mb-1"
+                            >
+                                중요도
+                            </label>
+                            <div class="flex items-center gap-6">
+                                <!-- High -->
+                                <label
+                                    class="flex flex-col items-center gap-1 cursor-pointer group"
+                                >
+                                    <input
+                                        v-model="formData.priority"
+                                        type="radio"
+                                        value="High"
+                                        class="peer hidden"
+                                    />
+                                    <span
+                                        class="material-symbols-outlined text-3xl rotate-90 text-gray-400 peer-checked:text-blue-600 group-hover:text-gray-600 transition-colors"
+                                    >
+                                        battery_full
+                                    </span>
+                                    <span
+                                        class="text-xs font-bold text-gray-400 peer-checked:text-blue-600 group-hover:text-gray-600 transition-colors"
+                                    >
+                                        HIGH
+                                    </span>
+                                </label>
+
+                                <!-- Medium -->
+                                <label
+                                    class="flex flex-col items-center gap-1 cursor-pointer group"
+                                >
+                                    <input
+                                        v-model="formData.priority"
+                                        type="radio"
+                                        value="Medium"
+                                        class="peer hidden"
+                                    />
+                                    <span
+                                        class="material-symbols-outlined text-3xl rotate-90 text-gray-400 peer-checked:text-blue-600 group-hover:text-gray-600 transition-colors"
+                                    >
+                                        battery_horiz_050
+                                    </span>
+                                    <span
+                                        class="text-xs font-bold text-gray-400 peer-checked:text-blue-600 group-hover:text-gray-600 transition-colors"
+                                    >
+                                        Medium
+                                    </span>
+                                </label>
+
+                                <!-- Low -->
+                                <label
+                                    class="flex flex-col items-center gap-1 cursor-pointer group"
+                                >
+                                    <input
+                                        v-model="formData.priority"
+                                        type="radio"
+                                        value="Low"
+                                        class="peer hidden"
+                                    />
+                                    <span
+                                        class="material-symbols-outlined text-3xl rotate-90 text-gray-400 peer-checked:text-blue-600 group-hover:text-gray-600 transition-colors"
+                                    >
+                                        battery_horiz_075
+                                    </span>
+                                    <span
+                                        class="text-xs font-bold text-gray-400 peer-checked:text-blue-600 group-hover:text-gray-600 transition-colors"
+                                    >
+                                        Low
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Function (Module) -->
                     <div class="space-y-2">
                         <label class="block text-sm font-bold text-gray-700">
-                            TC ID
+                            기능 (Module)
                         </label>
                         <div class="max-w-md">
                             <input
-                                v-model="formData.id"
+                                v-model="formData.module"
                                 type="text"
                                 class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                                placeholder="TC ID 입력"
+                                placeholder="기능 명을 입력하세요"
                             />
                         </div>
                     </div>
 
-                    <!-- Priority (Battery Icons) -->
-                    <div class="space-y-2 flex flex-col items-end">
-                        <label
-                            class="block text-sm font-bold text-gray-700 mb-1"
-                        >
-                            중요도
+                    <!-- Title -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-gray-700">
+                            타이틀 (Title)
                         </label>
-                        <div class="flex items-center gap-6">
-                            <!-- High -->
-                            <div
-                                class="flex flex-col items-center cursor-pointer"
+                        <div class="w-full">
+                            <input
+                                v-model="formData.title"
+                                type="text"
+                                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                                placeholder="타이틀을 입력하세요"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 시나리오 (드래그 지원) -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label class="text-lg font-bold text-gray-800">
+                                시나리오
+                            </label>
+                            <button
+                                type="button"
+                                @click="addScenarioStep"
+                                class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
                             >
-                                <input
-                                    v-model="formData.priority"
-                                    type="radio"
-                                    id="imp-high"
-                                    value="high"
-                                    class="peer hidden"
-                                />
-                                <label
-                                    for="imp-high"
-                                    class="flex flex-col items-center gap-1 cursor-pointer text-gray-400 peer-checked:text-blue-600 hover:text-gray-600 transition-colors"
+                                <span class="material-icons-outlined text-xl"
+                                    >add</span
                                 >
-                                    <span
-                                        class="material-symbols-outlined text-3xl rotate-90"
-                                        >battery_full</span
+                            </button>
+                        </div>
+
+                        <div
+                            class="border-t border-b border-gray-200 divide-y divide-gray-100"
+                        >
+                            <!--
+                                [Fix]: @ts-ignore added because 'handle' is a valid prop for SortableJS via vuedraggable,
+                                but standard Typescript definitions may not include it in the generic component props.
+                             -->
+                            <!-- @vue-ignore -->
+                            <draggable
+                                v-model="formData.scenario"
+                                item-key="text"
+                                handle=".handle"
+                                ghost-class="bg-blue-50"
+                            >
+                                <template #item="{element, index}">
+                                    <div
+                                        class="flex items-center gap-3 py-3 group"
                                     >
-                                    <span class="text-xs font-bold">HIGH</span>
-                                </label>
+                                        <!-- Drag Handle -->
+                                        <div
+                                            class="handle cursor-move text-gray-300 group-hover:text-gray-500 transition-colors"
+                                        >
+                                            <span
+                                                class="material-icons-outlined"
+                                                >drag_indicator</span
+                                            >
+                                        </div>
+                                        <!-- Index -->
+                                        <span
+                                            class="text-sm font-semibold text-gray-500 w-6"
+                                        >
+                                            {{ index + 1 }}.
+                                        </span>
+                                        <!-- Input -->
+                                        <input
+                                            v-model="element.text"
+                                            type="text"
+                                            class="flex-1 bg-transparent border-none focus:ring-0 p-0 text-gray-700 font-medium placeholder-gray-400"
+                                            placeholder="단계 입력..."
+                                        />
+                                        <!-- Remove Button -->
+                                        <button
+                                            type="button"
+                                            @click="removeScenarioStep(index)"
+                                            class="text-gray-300 hover:text-red-500 transition-colors"
+                                        >
+                                            <span
+                                                class="material-icons-outlined"
+                                                >remove_circle_outline</span
+                                            >
+                                        </button>
+                                    </div>
+                                </template>
+                            </draggable>
+                        </div>
+                    </div>
+
+                    <!-- 선행조건 & 기대결과 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-2">
+                            <label
+                                class="block text-sm font-bold text-gray-700"
+                            >
+                                선행조건
+                            </label>
+                            <div
+                                class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
+                            >
+                                <textarea
+                                    v-model="formData.precondition"
+                                    class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
+                                    placeholder="선행조건을 입력하세요"
+                                ></textarea>
                             </div>
-                            <!-- Medium -->
-                            <div
-                                class="flex flex-col items-center cursor-pointer"
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                class="block text-sm font-bold text-gray-700"
                             >
-                                <input
-                                    v-model="formData.priority"
-                                    type="radio"
-                                    id="imp-med"
-                                    value="medium"
-                                    class="peer hidden"
-                                />
-                                <label
-                                    for="imp-med"
-                                    class="flex flex-col items-center gap-1 cursor-pointer text-gray-400 peer-checked:text-blue-600 hover:text-gray-600 transition-colors"
-                                >
-                                    <span
-                                        class="material-symbols-outlined text-3xl rotate-90"
-                                        >battery_horiz_050</span
-                                    >
-                                    <span class="text-xs font-bold"
-                                        >Medium</span
-                                    >
-                                </label>
-                            </div>
-                            <!-- Low -->
+                                기대결과
+                            </label>
                             <div
-                                class="flex flex-col items-center cursor-pointer"
+                                class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
                             >
-                                <input
-                                    v-model="formData.priority"
-                                    type="radio"
-                                    id="imp-low"
-                                    value="low"
-                                    class="peer hidden"
-                                />
-                                <label
-                                    for="imp-low"
-                                    class="flex flex-col items-center gap-1 cursor-pointer text-gray-400 peer-checked:text-blue-600 hover:text-gray-600 transition-colors"
-                                >
-                                    <span
-                                        class="material-symbols-outlined text-3xl rotate-90"
-                                        >battery_horiz_075</span
-                                    >
-                                    <span class="text-xs font-bold">Low</span>
-                                </label>
+                                <textarea
+                                    v-model="formData.expectedResult"
+                                    class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
+                                    placeholder="기대결과를 입력하세요"
+                                ></textarea>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Function -->
-                <div class="space-y-2">
-                    <label class="block text-sm font-bold text-gray-700">
-                        기능
-                    </label>
-                    <div class="max-w-md">
-                        <input
-                            v-model="formData.function"
-                            type="text"
-                            class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                            placeholder="기능 명을 입력하세요"
-                        />
+                    <!-- 상태 (Status) -->
+                    <div class="pt-6 border-t border-gray-200">
+                        <div class="flex items-start gap-12">
+                            <label class="text-lg font-bold text-gray-800 mt-1">
+                                상태 (Status)
+                            </label>
+                            <div class="flex flex-col gap-4">
+                                <div class="flex gap-6">
+                                    <!-- Active -->
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            v-model="formData.status"
+                                            type="radio"
+                                            value="active"
+                                            class="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
+                                        />
+                                        <span
+                                            class="text-gray-700 font-medium badge bg-green-50 px-2 py-0.5 rounded-full text-xs"
+                                        >
+                                            Active
+                                        </span>
+                                    </label>
+                                    <!-- Inactive -->
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            v-model="formData.status"
+                                            type="radio"
+                                            value="inactive"
+                                            class="w-4 h-4 text-gray-600 focus:ring-gray-500 border-gray-300"
+                                        />
+                                        <span
+                                            class="text-gray-700 font-medium badge bg-gray-100 px-2 py-0.5 rounded-full text-xs"
+                                        >
+                                            Inactive
+                                        </span>
+                                    </label>
+                                    <!-- Generated -->
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            v-model="formData.status"
+                                            type="radio"
+                                            value="generated"
+                                            class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                        />
+                                        <span
+                                            class="text-gray-700 font-medium badge bg-blue-50 px-2 py-0.5 rounded-full text-xs"
+                                        >
+                                            Generated
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- 시나리오 (드래그 지원) -->
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <label class="text-lg font-bold text-gray-800">
-                            시나리오
-                        </label>
+                    <!-- 버튼 영역 -->
+                    <div class="flex items-center justify-center gap-4 pt-6">
                         <button
                             type="button"
-                            @click="addScenarioStep"
-                            class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
+                            @click="$router.push({name: 'TestCase'})"
+                            class="px-8 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors shadow-sm"
                         >
-                            <span class="material-icons-outlined text-xl"
-                                >add</span
-                            >
+                            목록으로
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-12 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
+                        >
+                            저장
                         </button>
                     </div>
+                </form>
+            </section>
 
-                    <div
-                        class="border-t border-b border-gray-200 divide-y divide-gray-100"
-                    >
-                        <draggable
-                            v-model="formData.scenario"
-                            item-key="text"
-                            handle=".handle"
-                            ghost-class="bg-blue-50"
-                        >
-                            <template #item="{element, index}">
-                                <div class="flex items-center gap-3 py-3 group">
-                                    <!-- Drag Handle -->
-                                    <div
-                                        class="handle cursor-move text-gray-300 group-hover:text-gray-500 transition-colors"
-                                    >
-                                        <span class="material-icons-outlined"
-                                            >drag_indicator</span
-                                        >
-                                    </div>
-                                    <!-- Index -->
-                                    <span
-                                        class="text-sm font-semibold text-gray-500 w-6"
-                                    >
-                                        {{ index + 1 }}.
-                                    </span>
-                                    <!-- Input -->
-                                    <input
-                                        v-model="element.text"
-                                        type="text"
-                                        class="flex-1 bg-transparent border-none focus:ring-0 p-0 text-gray-700 font-medium placeholder-gray-400"
-                                        placeholder="단계 입력..."
-                                    />
-                                    <!-- Remove Button -->
-                                    <button
-                                        type="button"
-                                        @click="removeScenarioStep(index)"
-                                        class="text-gray-300 hover:text-red-500 transition-colors"
-                                    >
-                                        <span class="material-icons-outlined"
-                                            >remove_circle_outline</span
-                                        >
-                                    </button>
-                                </div>
-                            </template>
-                        </draggable>
-                    </div>
-                </div>
-
-                <!-- 선행조건 & 기대결과 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-bold text-gray-700">
-                            선행조건
-                        </label>
-                        <div
-                            class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
-                        >
-                            <textarea
-                                v-model="formData.precondition"
-                                class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
-                                placeholder="선행조건을 입력하세요"
-                            ></textarea>
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <label class="block text-sm font-bold text-gray-700">
-                            기대결과
-                        </label>
-                        <div
-                            class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
-                        >
-                            <textarea
-                                v-model="formData.expectedResult"
-                                class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
-                                placeholder="기대결과를 입력하세요"
-                            ></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 검증 여부 -->
-                <div class="pt-6 border-t border-gray-200">
-                    <div class="flex items-start gap-12">
-                        <label class="text-lg font-bold text-gray-800 mt-1">
-                            검증여부
-                        </label>
-                        <div class="flex flex-col gap-4">
-                            <div
-                                class="p-3 bg-yellow-50 rounded-lg border border-yellow-200 text-xs text-gray-600 max-w-sm"
-                            >
-                                해당 테스트케이스의 사용 여부를 '사용' 또는
-                                '반려'로 선택해 주세요.
-                            </div>
-                            <div class="flex gap-6">
-                                <label
-                                    class="flex items-center gap-2 cursor-pointer"
-                                >
-                                    <input
-                                        v-model="formData.isVerified"
-                                        name="isVerified"
-                                        type="radio"
-                                        :value="true"
-                                        class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                    />
-                                    <span class="text-gray-700 font-medium"
-                                        >사용</span
-                                    >
-                                </label>
-                                <label
-                                    class="flex items-center gap-2 cursor-pointer"
-                                >
-                                    <input
-                                        v-model="formData.isVerified"
-                                        name="isVerified"
-                                        type="radio"
-                                        :value="false"
-                                        class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                    />
-                                    <span class="text-gray-700 font-medium"
-                                        >반려</span
-                                    >
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 저장/목록 버튼 -->
-                <div class="flex items-center justify-center gap-4 pt-6">
-                    <button
-                        type="button"
-                        @click="$router.go(-1)"
-                        class="px-8 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors shadow-sm"
-                    >
-                        목록으로
-                    </button>
-                    <button
-                        type="submit"
-                        class="px-12 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
-                    >
-                        저장
-                    </button>
-                </div>
-            </form>
-        </section>
-
-        <!-- 리뷰 & 히스토리 탭 -->
-        <section class="rounded-lg bg-white shadow">
-            <!-- 탭 헤더 -->
-            <div class="border-b border-gray-200 px-6">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button
-                        @click="activeTab = 'history'"
-                        :class="[
-                            activeTab === 'history'
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                            'whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors',
-                        ]"
-                    >
-                        변경 이력
-                    </button>
-                    <button
-                        @click="activeTab = 'comments'"
-                        :class="[
-                            activeTab === 'comments'
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                            'whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors flex items-center',
-                        ]"
-                    >
-                        리뷰 코멘트
-                        <span
+            <!-- 리뷰 & 히스토리 탭 (Mockup Restored) -->
+            <section class="rounded-lg bg-white shadow">
+                <!-- 탭 헤더 -->
+                <div class="border-b border-gray-200 px-6">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <button
+                            @click="activeTab = 'history'"
                             :class="[
-                                activeTab === 'comments'
-                                    ? 'bg-blue-100 text-blue-600'
-                                    : 'bg-gray-100 text-gray-900',
-                                'ml-2 py-0.5 px-2.5 rounded-full text-xs font-medium',
+                                activeTab === 'history'
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                                'whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors',
                             ]"
                         >
-                            {{ comments.length }}
-                        </span>
-                    </button>
-                </nav>
-            </div>
-
-            <!-- 탭 컨텐츠 -->
-            <div class="p-6">
-                <!-- 변경 이력 탭 -->
-                <div v-if="activeTab === 'history'" class="space-y-4">
-                    <div class="flex items-center gap-4 mb-4">
-                        <button
-                            class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition-colors"
-                        >
-                            선택한 버전 비교
+                            변경 이력
                         </button>
-                        <div
-                            class="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600"
+                        <button
+                            @click="activeTab = 'comments'"
+                            :class="[
+                                activeTab === 'comments'
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                                'whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors flex items-center',
+                            ]"
                         >
-                            저장 시점들의 이력을 확인하고 버전을 비교하거나
-                            복원할 수 있습니다.
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm text-gray-600">
-                            <thead class="border-b border-gray-200 bg-gray-50">
-                                <tr>
-                                    <th class="py-3 px-4 w-10">
-                                        <input
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        />
-                                    </th>
-                                    <th
-                                        class="py-3 px-4 font-medium text-gray-500"
-                                    >
-                                        버전
-                                    </th>
-                                    <th
-                                        class="py-3 px-4 font-medium text-gray-500"
-                                    >
-                                        발행일
-                                    </th>
-                                    <th
-                                        class="py-3 px-4 font-medium text-gray-500"
-                                    >
-                                        변경한 사람
-                                    </th>
-                                    <th
-                                        class="py-3 px-4 font-medium text-gray-500"
-                                    >
-                                        비고
-                                    </th>
-                                    <th
-                                        class="py-3 px-4 font-medium text-gray-500 text-right"
-                                    >
-                                        동작
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                <tr
-                                    v-for="(version, index) in versionHistory"
-                                    :key="index"
-                                    class="hover:bg-gray-50 transition-colors"
-                                >
-                                    <td class="py-3 px-4">
-                                        <input
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-primary focus:ring-primary"
-                                        />
-                                    </td>
-                                    <td class="py-3 px-4">
-                                        <span
-                                            :class="
-                                                index === 0
-                                                    ? 'text-blue-600 font-bold'
-                                                    : 'text-blue-600 cursor-pointer hover:underline'
-                                            "
-                                        >
-                                            {{ version.version }}
-                                        </span>
-                                    </td>
-                                    <td class="py-3 px-4">
-                                        {{ version.date }}
-                                    </td>
-                                    <td
-                                        class="py-3 px-4 font-medium text-gray-800"
-                                    >
-                                        {{ version.author }}
-                                    </td>
-                                    <td class="py-3 px-4 text-gray-500">
-                                        {{ version.comment || "-" }}
-                                    </td>
-                                    <td class="py-3 px-4 text-right">
-                                        <a
-                                            v-if="index > 0"
-                                            href="#"
-                                            class="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                                        >
-                                            복원
-                                        </a>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            리뷰 코멘트
+                            <span
+                                :class="[
+                                    activeTab === 'comments'
+                                        ? 'bg-blue-100 text-blue-600'
+                                        : 'bg-gray-100 text-gray-900',
+                                    'ml-2 py-0.5 px-2.5 rounded-full text-xs font-medium',
+                                ]"
+                            >
+                                {{ comments.length }}
+                            </span>
+                        </button>
+                    </nav>
                 </div>
 
-                <!-- 코멘트 탭 -->
-                <div v-if="activeTab === 'comments'" class="space-y-6">
-                    <!-- 코멘트 입력 -->
-                    <div class="flex gap-4">
-                        <div
-                            class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
-                        >
-                            <span class="material-icons-outlined text-blue-600"
-                                >person</span
+                <!-- 탭 컨텐츠 -->
+                <div class="p-6">
+                    <!-- 변경 이력 탭 -->
+                    <div v-if="activeTab === 'history'" class="space-y-4">
+                        <div class="flex items-center gap-4 mb-4">
+                            <button
+                                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition-colors"
                             >
-                        </div>
-                        <div class="flex-1 space-y-2">
-                            <textarea
-                                v-model="newComment"
-                                rows="3"
-                                class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 text-sm resize-none"
-                                placeholder="리뷰 코멘트를 작성해주세요..."
-                            ></textarea>
-                            <div class="flex justify-end">
-                                <button
-                                    type="button"
-                                    @click="addComment"
-                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-                                    :disabled="!newComment.trim()"
-                                >
-                                    등록
-                                </button>
+                                선택한 버전 비교
+                            </button>
+                            <div
+                                class="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600"
+                            >
+                                저장 시점들의 이력을 확인하고 버전을 비교하거나
+                                복원할 수 있습니다.
                             </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table
+                                class="w-full text-left text-sm text-gray-600"
+                            >
+                                <thead
+                                    class="border-b border-gray-200 bg-gray-50"
+                                >
+                                    <tr>
+                                        <th class="py-3 px-4 w-10">
+                                            <input
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                        </th>
+                                        <th
+                                            class="py-3 px-4 font-medium text-gray-500"
+                                        >
+                                            버전
+                                        </th>
+                                        <th
+                                            class="py-3 px-4 font-medium text-gray-500"
+                                        >
+                                            발행일
+                                        </th>
+                                        <th
+                                            class="py-3 px-4 font-medium text-gray-500"
+                                        >
+                                            변경한 사람
+                                        </th>
+                                        <th
+                                            class="py-3 px-4 font-medium text-gray-500"
+                                        >
+                                            비고
+                                        </th>
+                                        <th
+                                            class="py-3 px-4 font-medium text-gray-500 text-right"
+                                        >
+                                            동작
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr
+                                        v-for="(
+                                            version, index
+                                        ) in versionHistory"
+                                        :key="index"
+                                        class="hover:bg-gray-50 transition-colors"
+                                    >
+                                        <td class="py-3 px-4">
+                                            <input
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span
+                                                :class="
+                                                    index === 0
+                                                        ? 'text-blue-600 font-bold'
+                                                        : 'text-blue-600 cursor-pointer hover:underline'
+                                                "
+                                            >
+                                                {{ version.version }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            {{ version.date }}
+                                        </td>
+                                        <td
+                                            class="py-3 px-4 font-medium text-gray-800"
+                                        >
+                                            {{ version.author }}
+                                        </td>
+                                        <td class="py-3 px-4 text-gray-500">
+                                            {{ version.comment || "-" }}
+                                        </td>
+                                        <td class="py-3 px-4 text-right">
+                                            <a
+                                                v-if="index > 0"
+                                                href="#"
+                                                class="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                            >
+                                                복원
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <!-- 코멘트 리스트 -->
-                    <div class="space-y-6">
-                        <div
-                            v-for="comment in comments"
-                            :key="comment.id"
-                            class="space-y-4"
-                        >
-                            <!-- 메인 코멘트 -->
+                    <!-- 코멘트 탭 -->
+                    <div v-if="activeTab === 'comments'" class="space-y-6">
+                        <!-- 코멘트 입력 -->
+                        <div class="flex gap-4">
                             <div
-                                class="group flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                                class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
                             >
-                                <div
-                                    class="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
+                                <span
+                                    class="material-icons-outlined text-blue-600"
+                                    >person</span
                                 >
-                                    <span
-                                        class="material-icons-outlined text-gray-400"
-                                        >face</span
+                            </div>
+                            <div class="flex-1 space-y-2">
+                                <textarea
+                                    v-model="newComment"
+                                    rows="3"
+                                    class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 text-sm resize-none"
+                                    placeholder="리뷰 코멘트를 작성해주세요..."
+                                ></textarea>
+                                <div class="flex justify-end">
+                                    <button
+                                        type="button"
+                                        @click="addComment"
+                                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                                        :disabled="!newComment.trim()"
                                     >
-                                </div>
-                                <div class="flex-1 space-y-1">
-                                    <div
-                                        class="flex items-center justify-between"
-                                    >
-                                        <h4
-                                            class="font-bold text-gray-900 text-sm"
-                                        >
-                                            {{ comment.author }}
-                                        </h4>
-                                        <div class="flex items-center gap-3">
-                                            <span
-                                                class="text-xs text-gray-500"
-                                                >{{ comment.date }}</span
-                                            >
-                                            <!-- Action Buttons -->
-                                            <div
-                                                class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <button
-                                                    @click="
-                                                        toggleReply(comment.id)
-                                                    "
-                                                    class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                                    title="답글 작성"
-                                                >
-                                                    <span
-                                                        class="material-icons-outlined text-sm"
-                                                        >chat_bubble_outline</span
-                                                    >
-                                                </button>
-                                                <button
-                                                    class="text-gray-400 hover:text-red-500 flex items-center"
-                                                    title="삭제"
-                                                >
-                                                    <span
-                                                        class="material-icons-outlined text-lg"
-                                                        >delete</span
-                                                    >
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p
-                                        class="text-gray-700 text-sm whitespace-pre-wrap"
-                                    >
-                                        {{ comment.content }}
-                                    </p>
+                                        등록
+                                    </button>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- 대댓글 리스트 -->
+                        <!-- 코멘트 리스트 -->
+                        <div class="space-y-6">
                             <div
-                                v-if="
-                                    comment.replies &&
-                                    comment.replies.length > 0
-                                "
-                                class="pl-12 space-y-3"
+                                v-for="comment in comments"
+                                :key="comment.id"
+                                class="space-y-4"
                             >
+                                <!-- 메인 코멘트 -->
                                 <div
-                                    v-for="reply in comment.replies"
-                                    :key="reply.id"
-                                    class="flex gap-4 p-3 rounded-lg bg-gray-50/50 border-l-2 border-blue-100 group"
+                                    class="group flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                                 >
                                     <div
-                                        class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
+                                        class="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
                                     >
                                         <span
-                                            class="material-icons-outlined text-gray-400 text-sm"
+                                            class="material-icons-outlined text-gray-400"
                                             >face</span
                                         >
                                     </div>
@@ -682,110 +744,177 @@ const handleSubmit = () => {
                                         <div
                                             class="flex items-center justify-between"
                                         >
-                                            <div
-                                                class="flex items-center gap-2"
+                                            <h4
+                                                class="font-bold text-gray-900 text-sm"
                                             >
-                                                <h4
-                                                    class="font-bold text-gray-900 text-sm"
-                                                >
-                                                    {{ reply.author }}
-                                                </h4>
-                                                <span
-                                                    class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-medium border border-blue-100"
-                                                    >Writer</span
-                                                >
-                                            </div>
+                                                {{ comment.author }}
+                                            </h4>
                                             <div
                                                 class="flex items-center gap-3"
                                             >
                                                 <span
                                                     class="text-xs text-gray-500"
-                                                    >{{ reply.date }}</span
+                                                    >{{ comment.date }}</span
                                                 >
-                                                <!-- Delete Button for Reply -->
-                                                <button
-                                                    class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-                                                    title="삭제"
+                                                <!-- Action Buttons -->
+                                                <div
+                                                    class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
-                                                    <span
-                                                        class="material-icons-outlined text-sm"
-                                                        >delete</span
+                                                    <button
+                                                        @click="
+                                                            toggleReply(
+                                                                comment.id
+                                                            )
+                                                        "
+                                                        class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                                        title="답글 작성"
                                                     >
-                                                </button>
+                                                        <span
+                                                            class="material-icons-outlined text-sm"
+                                                            >chat_bubble_outline</span
+                                                        >
+                                                    </button>
+                                                    <button
+                                                        class="text-gray-400 hover:text-red-500 flex items-center"
+                                                        title="삭제"
+                                                    >
+                                                        <span
+                                                            class="material-icons-outlined text-lg"
+                                                            >delete</span
+                                                        >
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                         <p
-                                            class="text-gray-600 text-sm whitespace-pre-wrap"
+                                            class="text-gray-700 text-sm whitespace-pre-wrap"
                                         >
-                                            {{ reply.content }}
+                                            {{ comment.content }}
                                         </p>
                                     </div>
-                                    <!-- Delete Button for Reply -->
-                                    <button
-                                        class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all absolute top-3 right-3"
+                                </div>
+
+                                <!-- 대댓글 리스트 -->
+                                <div
+                                    v-if="
+                                        comment.replies &&
+                                        comment.replies.length > 0
+                                    "
+                                    class="pl-12 space-y-3"
+                                >
+                                    <div
+                                        v-for="reply in comment.replies"
+                                        :key="reply.id"
+                                        class="flex gap-4 p-3 rounded-lg bg-gray-50/50 border-l-2 border-blue-100 group"
+                                    >
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
+                                        >
+                                            <span
+                                                class="material-icons-outlined text-gray-400 text-sm"
+                                                >face</span
+                                            >
+                                        </div>
+                                        <div class="flex-1 space-y-1">
+                                            <div
+                                                class="flex items-center justify-between"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <h4
+                                                        class="font-bold text-gray-900 text-sm"
+                                                    >
+                                                        {{ reply.author }}
+                                                    </h4>
+                                                    <span
+                                                        class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-medium border border-blue-100"
+                                                        >Writer</span
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="flex items-center gap-3"
+                                                >
+                                                    <span
+                                                        class="text-xs text-gray-500"
+                                                        >{{ reply.date }}</span
+                                                    >
+                                                    <!-- Delete Button for Reply -->
+                                                    <button
+                                                        class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                                                        title="삭제"
+                                                    >
+                                                        <span
+                                                            class="material-icons-outlined text-sm"
+                                                            >delete</span
+                                                        >
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p
+                                                class="text-gray-600 text-sm whitespace-pre-wrap"
+                                            >
+                                                {{ reply.content }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reply Input Form -->
+                                <div
+                                    v-if="replyingTo === comment.id"
+                                    class="pl-12 flex gap-3 animate-fade-in"
+                                >
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
                                     >
                                         <span
-                                            class="material-icons-outlined text-sm"
-                                            >delete</span
+                                            class="material-icons-outlined text-blue-600 text-sm"
+                                            >subdirectory_arrow_right</span
                                         >
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Reply Input Form -->
-                            <div
-                                v-if="replyingTo === comment.id"
-                                class="pl-12 flex gap-3 animate-fade-in"
-                            >
-                                <div
-                                    class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
-                                >
-                                    <span
-                                        class="material-icons-outlined text-blue-600 text-sm"
-                                        >subdirectory_arrow_right</span
-                                    >
-                                </div>
-                                <div class="flex-1 space-y-2">
-                                    <textarea
-                                        v-model="newReply"
-                                        rows="2"
-                                        class="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-900 text-sm resize-none"
-                                        placeholder="답글을 작성해주세요..."
-                                        ref="replyInput"
-                                    ></textarea>
-                                    <div class="flex justify-end gap-2">
-                                        <button
-                                            @click="toggleReply(comment.id)"
-                                            class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded transition-colors"
-                                        >
-                                            취소
-                                        </button>
-                                        <button
-                                            @click="addReply(comment.id)"
-                                            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors shadow-sm"
-                                            :disabled="!newReply.trim()"
-                                        >
-                                            답글 등록
-                                        </button>
+                                    </div>
+                                    <div class="flex-1 space-y-2">
+                                        <textarea
+                                            v-model="newReply"
+                                            rows="2"
+                                            class="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-900 text-sm resize-none"
+                                            placeholder="답글을 작성해주세요..."
+                                            ref="replyInput"
+                                        ></textarea>
+                                        <div class="flex justify-end gap-2">
+                                            <button
+                                                @click="toggleReply(comment.id)"
+                                                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded transition-colors"
+                                            >
+                                                취소
+                                            </button>
+                                            <button
+                                                @click="addReply(comment.id)"
+                                                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors shadow-sm"
+                                                :disabled="!newReply.trim()"
+                                            >
+                                                답글 등록
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <!-- Empty State -->
-                        <div
-                            v-if="comments.length === 0"
-                            class="text-center py-12 text-gray-500"
-                        >
-                            <span
-                                class="material-icons-outlined text-4xl mb-2 text-gray-300"
-                                >chat_bubble_outline</span
+                            <!-- Empty State -->
+                            <div
+                                v-if="comments.length === 0"
+                                class="text-center py-12 text-gray-500"
                             >
-                            <p>등록된 리뷰 코멘트가 없습니다.</p>
+                                <span
+                                    class="material-icons-outlined text-4xl mb-2 text-gray-300"
+                                    >chat_bubble_outline</span
+                                >
+                                <p>등록된 리뷰 코멘트가 없습니다.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        </template>
     </main>
 </template>
 

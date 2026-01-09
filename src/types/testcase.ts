@@ -1,10 +1,43 @@
-// 생성된 TC 항목 구조
-export type TestCase = {
-    testcase_id: string | number; // TC 식별자
-    title?: string; // 제목
-    priority?: string; // 우선순위 (P1, P2 등)
-    expected_result?: string; // 기대 결과
-    preconditions?: string; // 사전 조건
-    module?: string; // 기능 모듈 명
-    steps?: string[]; // 테스트 스텝 단계
-};
+// 생성된 TC 항목 구조 (TestcaseBase)
+export interface TestcaseBase {
+    module: string;
+    title: string;
+    preconditions?: string | null;
+    steps: string[];
+    expected_result: string;
+    priority?: string | null;
+    status: string; // generated, active, inactive
+}
+
+export interface TestcaseCreate extends TestcaseBase {
+    project_id: number;
+    history_id?: number | null;
+    testcase_id_tag?: string | null;
+}
+
+export interface TestcaseUpdate {
+    module?: string;
+    title?: string;
+    preconditions?: string | null;
+    steps?: string[];
+    expected_result?: string;
+    priority?: string | null;
+    status?: string;
+}
+
+export interface TestcaseResponse extends TestcaseBase {
+    id: number;
+    project_id: number;
+    history_id?: number | null;
+    testcase_id_tag?: string | null;
+    created_at: string; // ISO datetime string
+    updated_at: string; // ISO datetime string
+}
+
+// 목록 조회 파라미터
+export interface TestcaseListParams {
+    project_id: number;
+    skip?: number;
+    limit?: number;
+    status?: string;
+}
