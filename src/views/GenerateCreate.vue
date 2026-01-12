@@ -11,7 +11,7 @@ import {
 } from "../types/project.js";
 import router from "../router/index.js";
 import BaseModal from "../components/BaseModal.vue";
-
+import {useAlert} from "../composables/useAlert.js";
 // 날짜 포맷 헬퍼
 const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
@@ -176,6 +176,8 @@ const getArtifactCount = (type: string) => {
     return `${selected}/${items.length}`;
 };
 
+// --- Setup ---
+const {showAlert} = useAlert();
 // 초기 데이터 로드 (Projects + Ollama Models)
 onMounted(async () => {
     // 1. 프로젝트 목록 로드
@@ -216,45 +218,44 @@ const handleCancel = () => {
     router.back();
 };
 
-const isSubmitting = ref(false);
+const isGenerating = ref(false);
 const generationStatus = ref<"idle" | "generating" | "done">("idle");
-const handleSubmit = () => {
-    if (isSubmitting.value) return;
+const handleGenerate = async () => {
+    if (isGenerating.value) return;
     if (!selectedProjectId.value) {
-        alert("프로젝트를 선택해주세요.");
+        showAlert("프로젝트를 선택해주세요.", "알림");
         return;
     }
 
-    isSubmitting.value = true;
+    isGenerating.value = true;
     generationStatus.value = "generating";
 
-    startGeneration({
-        project_id: selectedProjectId.value, // 선택된 ID 사용
-        title: title.value,
-        model: selectedModel.value,
-        language: selectedLanguage.value,
-        tcPrefix: tcPrefix.value,
-        artifact_ids: selectedArtifactIds.value,
-        feature_ids: selectedFeatureIds.value,
-        external_system_ids: selectedExternalSystemIds.value,
-    }).catch((error) => {
-        console.error("자동 생성 시작 중 오류 발생:", error);
-        alert("생성 요청 중 오류가 발생했습니다: " + error.message);
-        isSubmitting.value = false;
-        generationStatus.value = "idle";
-    });
+    try {
+        const payload = {
+            title: title.value,
+            project_id: selectedProjectId.value,
+            model: selectedModel.value,
+            language: selectedLanguage.value,
+            tcPrefix: tcPrefix.value,
+            artifact_ids: selectedArtifactIds.value,
+            feature_ids: selectedFeatureIds.value,
+            external_system_ids: selectedExternalSystemIds.value,
+        };
 
-    // 생성 완료 후 페이지 이동
-    setTimeout(() => {
+        const response = await startGeneration(payload);
+
         generationStatus.value = "done";
-    }, 1500);
 
-    setTimeout(() => {
-        router.push("/generate").finally(() => {
-            isSubmitting.value = false;
-            generationStatus.value = "idle";
-        });
-    }, 2500);
+        // 잠시 완료 상태 보여준 후 이동
+        setTimeout(() => {
+            router.push("/generate");
+        }, 1000);
+    } catch (error: any) {
+        console.error("Generate failed:", error);
+        showAlert(error.message || "생성 시작에 실패했습니다.", "오류");
+        isGenerating.value = false;
+        generationStatus.value = "idle";
+    }
 };
 </script>
 
@@ -769,11 +770,11 @@ const handleSubmit = () => {
                 </button>
                 <button
                     type="submit"
-                    :disabled="isSubmitting"
+                    :disabled="isGenerating"
                     class="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    @click.prevent="handleSubmit"
+                    @click.prevent="handleGenerate"
                 >
-                    <span v-if="isSubmitting">처리 중...</span>
+                    <span v-if="isGenerating">처리 중...</span>
                     <span v-else>자동 생성 시작</span>
                     <span class="material-icons-outlined text-base">
                         play_arrow

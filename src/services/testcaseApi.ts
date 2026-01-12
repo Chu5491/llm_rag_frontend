@@ -13,14 +13,14 @@ export async function getTestCaseList(
     const query = new URLSearchParams({
         project_id: params.project_id.toString(),
         skip: (params.skip || 0).toString(),
+        limit: (params.limit !== undefined ? params.limit : 0).toString(), // Default to 0 (all) if undefined, or explicit value
     });
 
-    if (params.limit !== undefined) {
-        query.append("limit", params.limit.toString());
-    }
-    if (params.status !== undefined) {
-        query.append("status", params.status.toString());
-    }
+    if (params.status) query.append("status", params.status);
+    if (params.history_id)
+        query.append("history_id", params.history_id.toString());
+    if (params.priority) query.append("priority", params.priority);
+    if (params.module) query.append("module", params.module);
 
     const res = await fetch(`/api/v1/testcases?${query.toString()}`);
     if (!res.ok) {

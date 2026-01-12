@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import {ref, onMounted} from "vue";
+import {ref, onMounted, watch} from "vue";
 import {useRoute, useRouter} from "vue-router";
 import draggable from "vuedraggable";
+import {useAlert} from "../composables/useAlert.js";
 import {
     getTestCaseDetail,
     updateTestCase,
@@ -10,7 +11,8 @@ import {
 
 // --- Types ---
 interface ScenarioStep {
-    text: string;
+    action: string;
+    expected: string;
 }
 
 interface TestCaseForm {
@@ -27,6 +29,7 @@ interface TestCaseForm {
 
 const route = useRoute();
 const router = useRouter();
+const {showAlert, showConfirm} = useAlert();
 
 // --- State ---
 const isLoading = ref(false);
@@ -38,13 +41,13 @@ const formData = ref<TestCaseForm>({
     module: "",
     title: "",
     priority: "Low",
-    scenario: [{text: ""}],
+    scenario: [{action: "", expected: ""}],
     precondition: "",
     expectedResult: "",
     status: "inactive",
 });
 
-// --- Mockup State (History & Comments) ---
+// --- Mockup State ---
 const activeTab = ref("history");
 const newComment = ref("");
 const newReply = ref("");
@@ -144,8 +147,11 @@ const fetchDetail = async () => {
             priority: data.priority || "Low",
             scenario:
                 data.steps && data.steps.length > 0
-                    ? data.steps.map((s) => ({text: s}))
-                    : [{text: ""}],
+                    ? data.steps.map((s) => ({
+                          action: s.action,
+                          expected: s.expected,
+                      }))
+                    : [{action: "", expected: ""}],
             precondition: data.preconditions || "",
             expectedResult: data.expected_result,
             status: data.status,
@@ -160,7 +166,7 @@ const fetchDetail = async () => {
 
 // 시나리오 단계 추가
 const addScenarioStep = () => {
-    formData.value.scenario.push({text: ""});
+    formData.value.scenario.push({action: "", expected: ""});
 };
 
 // 시나리오 단계 제거
@@ -174,7 +180,8 @@ const removeScenarioStep = (index: number) => {
 const handleSubmit = async () => {
     if (!formData.value.id) return;
 
-    if (!confirm("변경사항을 저장하시겠습니까?")) return;
+    const confirmed = await showConfirm("변경사항을 저장하시겠습니까?", "확인");
+    if (!confirmed) return;
 
     try {
         const updateData: TestcaseUpdate = {
@@ -183,16 +190,20 @@ const handleSubmit = async () => {
             priority: formData.value.priority,
             preconditions: formData.value.precondition,
             expected_result: formData.value.expectedResult,
-            steps: formData.value.scenario.map((s) => s.text),
+            steps: formData.value.scenario.map((s) => ({
+                action: s.action,
+                expected: s.expected,
+            })),
             status: formData.value.status,
         };
 
-        await updateTestCase(formData.value.id, updateData);
-        alert("저장되었습니다.");
-        router.push({name: "TestCase"});
-    } catch (err) {
-        console.error("Failed to update test case:", err);
-        alert("저장 중 오류가 발생했습니다.");
+        const response = await updateTestCase(formData.value.id, updateData);
+        if (response) {
+            showAlert("저장되었습니다.", "성공");
+        }
+    } catch (error) {
+        console.error("Failed to update test case:", error);
+        showAlert("저장 중 오류가 발생했습니다.", "오류");
     }
 };
 
@@ -224,29 +235,60 @@ onMounted(() => {
             <!-- 메인 카드 -->
             <section class="rounded-lg bg-white p-6 shadow">
                 <form class="space-y-8" @submit.prevent="handleSubmit">
-                    <!-- 상단: TC ID & 중요도 -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <!-- TC ID (Read-only) -->
-                        <div class="space-y-2">
+                    <!-- 1. Row: TC ID -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-gray-700">
+                            TC ID
+                        </label>
+                        <div class="max-w-xs">
+                            <input
+                                v-model="formData.testcase_id_tag"
+                                type="text"
+                                readonly
+                                class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed text-center font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 2. Row: Title -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-gray-700">
+                            타이틀
+                        </label>
+                        <div class="max-w-lg">
+                            <input
+                                v-model="formData.title"
+                                type="text"
+                                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                                placeholder="타이틀을 입력하세요"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 3. Row: Module & Priority -->
+                    <div class="flex flex-wrap items-end gap-10">
+                        <!-- Module -->
+                        <div class="space-y-2 flex-1 md:flex-none md:w-1/3">
                             <label
                                 class="block text-sm font-bold text-gray-700"
                             >
-                                TC ID
+                                기능
                             </label>
-                            <div class="max-w-md">
+                            <div>
                                 <input
-                                    v-model="formData.testcase_id_tag"
+                                    v-model="formData.module"
                                     type="text"
                                     readonly
                                     class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
+                                    placeholder="기능 명"
                                 />
                             </div>
                         </div>
 
                         <!-- Priority -->
-                        <div class="space-y-2 flex flex-col items-end">
+                        <div class="space-y-2 pb-1">
                             <label
-                                class="block text-sm font-bold text-gray-700 mb-1"
+                                class="block text-sm font-bold text-gray-700 mb-2"
                             >
                                 중요도
                             </label>
@@ -320,37 +362,23 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <!-- Function (Module) -->
+                    <!-- 3. Row: Preconditions -->
                     <div class="space-y-2">
                         <label class="block text-sm font-bold text-gray-700">
-                            기능 (Module)
+                            선행조건
                         </label>
-                        <div class="max-w-md">
-                            <input
-                                v-model="formData.module"
-                                type="text"
-                                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                                placeholder="기능 명을 입력하세요"
-                            />
+                        <div
+                            class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
+                        >
+                            <textarea
+                                v-model="formData.precondition"
+                                class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
+                                placeholder="테스트 수행 전 만족해야 할 선행조건을 입력하세요"
+                            ></textarea>
                         </div>
                     </div>
 
-                    <!-- Title -->
-                    <div class="space-y-2">
-                        <label class="block text-sm font-bold text-gray-700">
-                            타이틀 (Title)
-                        </label>
-                        <div class="w-full">
-                            <input
-                                v-model="formData.title"
-                                type="text"
-                                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                                placeholder="타이틀을 입력하세요"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- 시나리오 (드래그 지원) -->
+                    <!-- 4. Row: Scenario -->
                     <div class="space-y-3">
                         <div class="flex items-center justify-between">
                             <label class="text-lg font-bold text-gray-800">
@@ -370,10 +398,6 @@ onMounted(() => {
                         <div
                             class="border-t border-b border-gray-200 divide-y divide-gray-100"
                         >
-                            <!--
-                                [Fix]: @ts-ignore added because 'handle' is a valid prop for SortableJS via vuedraggable,
-                                but standard Typescript definitions may not include it in the generic component props.
-                             -->
                             <!-- @vue-ignore -->
                             <draggable
                                 v-model="formData.scenario"
@@ -400,13 +424,32 @@ onMounted(() => {
                                         >
                                             {{ index + 1 }}.
                                         </span>
-                                        <!-- Input -->
-                                        <input
-                                            v-model="element.text"
-                                            type="text"
-                                            class="flex-1 bg-transparent border-none focus:ring-0 p-0 text-gray-700 font-medium placeholder-gray-400"
-                                            placeholder="단계 입력..."
-                                        />
+                                        <!-- Action Input -->
+                                        <div class="flex-1 flex flex-col gap-1">
+                                            <label
+                                                class="text-xs font-semibold text-gray-500"
+                                                >Action</label
+                                            >
+                                            <textarea
+                                                v-model="element.action"
+                                                rows="2"
+                                                class="w-full bg-white border border-gray-200 rounded p-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-colors resize-none placeholder-gray-300"
+                                                placeholder="행동을 입력하세요..."
+                                            ></textarea>
+                                        </div>
+                                        <!-- Expected Input -->
+                                        <div class="flex-1 flex flex-col gap-1">
+                                            <label
+                                                class="text-xs font-semibold text-gray-500"
+                                                >Expected</label
+                                            >
+                                            <textarea
+                                                v-model="element.expected"
+                                                rows="2"
+                                                class="w-full bg-white border border-gray-200 rounded p-2 text-sm focus:ring-2 focus:ring-green-100 focus:border-green-300 transition-colors resize-none placeholder-gray-300"
+                                                placeholder="기대결과를 입력하세요..."
+                                            ></textarea>
+                                        </div>
                                         <!-- Remove Button -->
                                         <button
                                             type="button"
@@ -424,39 +467,19 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <!-- 선행조건 & 기대결과 -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div class="space-y-2">
-                            <label
-                                class="block text-sm font-bold text-gray-700"
-                            >
-                                선행조건
-                            </label>
-                            <div
-                                class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
-                            >
-                                <textarea
-                                    v-model="formData.precondition"
-                                    class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
-                                    placeholder="선행조건을 입력하세요"
-                                ></textarea>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label
-                                class="block text-sm font-bold text-gray-700"
-                            >
-                                기대결과
-                            </label>
-                            <div
-                                class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
-                            >
-                                <textarea
-                                    v-model="formData.expectedResult"
-                                    class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
-                                    placeholder="기대결과를 입력하세요"
-                                ></textarea>
-                            </div>
+                    <!-- 5. Row: Expected Result -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-gray-700">
+                            최종 기대결과
+                        </label>
+                        <div
+                            class="w-full border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent"
+                        >
+                            <textarea
+                                v-model="formData.expectedResult"
+                                class="w-full h-24 bg-transparent border-none focus:ring-0 resize-none text-sm text-gray-700"
+                                placeholder="전체 시나리오 수행 후의 최종 기대결과를 입력하세요"
+                            ></textarea>
                         </div>
                     </div>
 
@@ -525,7 +548,7 @@ onMounted(() => {
                     <div class="flex items-center justify-center gap-4 pt-6">
                         <button
                             type="button"
-                            @click="$router.push({name: 'TestCase'})"
+                            @click="router.go(-1)"
                             class="px-8 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors shadow-sm"
                         >
                             목록으로

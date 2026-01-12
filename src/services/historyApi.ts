@@ -57,8 +57,13 @@ export async function checkFigmaPersist(
 }
 
 // 히스토리 목록 조회
-export async function fetchHistories(): Promise<GenerationItem[]> {
-    const res = await fetch("/api/v1/history");
+export async function fetchHistories(
+    projectId?: number
+): Promise<GenerationItem[]> {
+    const url = projectId
+        ? `/api/v1/history?project_id=${projectId}`
+        : "/api/v1/history";
+    const res = await fetch(url);
     if (!res.ok) {
         throw new Error("히스토리 조회에 실패했습니다.");
     }

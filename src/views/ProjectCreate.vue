@@ -2,6 +2,7 @@
 import {ref, computed, onUnmounted} from "vue";
 import {useRouter} from "vue-router";
 import {checkFigmaPersist, createProject} from "../services/api.js";
+import {useAlert} from "../composables/useAlert.js";
 
 import {
     ArtifactItem,
@@ -16,6 +17,7 @@ import {
 import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
 
 const router = useRouter();
+const {showAlert} = useAlert();
 
 // 저장 상태 (idle, saving, done)
 const saveStatus = ref<"idle" | "saving" | "done">("idle");
@@ -207,7 +209,7 @@ const handleSubmit = async () => {
         }, 1500);
     } catch (error) {
         console.error("프로젝트 생성 실패:", error);
-        alert("프로젝트 생성에 실패했습니다. 다시 시도해주세요.");
+        showAlert("프로젝트 생성에 실패했습니다. 다시 시도해주세요.", "오류");
         saveStatus.value = "idle";
     }
 };

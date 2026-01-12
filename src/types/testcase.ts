@@ -3,10 +3,15 @@ export interface TestcaseBase {
     module: string;
     title: string;
     preconditions?: string | null;
-    steps: string[];
+    steps: TestcaseStep[]; // steps 구조 변경 string[] -> TestcaseStep[]
     expected_result: string;
     priority?: string | null;
     status: string; // generated, active, inactive
+}
+
+export interface TestcaseStep {
+    action: string;
+    expected: string;
 }
 
 export interface TestcaseCreate extends TestcaseBase {
@@ -19,7 +24,7 @@ export interface TestcaseUpdate {
     module?: string;
     title?: string;
     preconditions?: string | null;
-    steps?: string[];
+    steps?: TestcaseStep[];
     expected_result?: string;
     priority?: string | null;
     status?: string;
@@ -29,7 +34,7 @@ export interface TestcaseResponse extends TestcaseBase {
     id: number;
     project_id: number;
     history_id?: number | null;
-    testcase_id_tag?: string | null;
+    testcase_id_tag?: string | "";
     created_at: string; // ISO datetime string
     updated_at: string; // ISO datetime string
 }
@@ -40,4 +45,7 @@ export interface TestcaseListParams {
     skip?: number;
     limit?: number;
     status?: string;
+    history_id?: number | null;
+    priority?: string;
+    module?: string;
 }

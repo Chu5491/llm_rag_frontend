@@ -1,32 +1,83 @@
 <script setup lang="ts">
-import {ref, onMounted} from "vue";
-import {useRouter} from "vue-router";
+import {ref, onMounted, computed, watch} from "vue";
+import {useRouter, useRoute} from "vue-router";
 import {fetchProjects} from "../services/projectApi.js";
 import type {ProjectResponse} from "../types/project.js";
 import Table, {type Column} from "../components/Table.vue";
+import LoadingSpinner from "../components/LoadingSpinner.vue";
+import SearchFilterBar from "../components/SearchFilterBar.vue";
 
 const router = useRouter();
+const route = useRoute();
 
 // 프로젝트 목록 상태
 const projects = ref<ProjectResponse[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const itemsPerPage = ref(10);
+const searchQuery = ref((route.query.q as string) || "");
+
+// URL 동기화
+watch(searchQuery, (newVal) => {
+    router.replace({
+        query: {
+            ...route.query,
+            q: newVal || undefined,
+        },
+    });
+});
+
+// 검색 필터링
+const filteredProjects = computed(() => {
+    if (!searchQuery.value) return projects.value;
+    const query = searchQuery.value.toLowerCase();
+    return projects.value.filter(
+        (p) =>
+            p.name.toLowerCase().includes(query) ||
+            (p.description && p.description.toLowerCase().includes(query))
+    );
+});
 
 // 테이블 컬럼 정의
 const tableColumns: Column[] = [
     {key: "id", label: "ID", width: "w-16", align: "center", sortable: true},
     {key: "name", label: "프로젝트명", width: "w-48", sortable: true},
-    {key: "service_type", label: "서비스 유형", sortable: true},
-    {key: "description", label: "설명", sortable: false},
+    {key: "status", label: "상태", width: "w-24", align: "center"},
+    {key: "service_type", label: "유형", width: "w-32", sortable: true},
+    {key: "description", label: "설명", width: "w-24", sortable: false},
     {
         key: "tc_count",
-        label: "생성 TC 건 수",
+        label: "TC 건 수",
+        width: "w-28",
+        align: "center",
+        sortable: true,
+    },
+    {
+        key: "created_at",
+        label: "등록일",
         width: "w-32",
         align: "center",
         sortable: true,
     },
+    {
+        key: "updated_at",
+        label: "수정일",
+        width: "w-32",
+        align: "center",
+        sortable: true,
+    },
+    {key: "is_active", label: "사용 여부", width: "w-32", align: "center"},
 ];
+
+// 날짜 포맷팅 Helper
+const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    });
+};
 
 // 데이터 로드 (전체 로드)
 const loadProjects = async () => {
@@ -80,20 +131,25 @@ onMounted(() => {
             </RouterLink>
         </header>
 
+        <!-- 검색 필터 -->
+        <SearchFilterBar
+            :search-query="searchQuery"
+            search-placeholder="프로젝트 명 또는 설명으로 검색하세요..."
+            :projects="undefined!"
+            :selected-project-id="null"
+            @update:search-query="searchQuery = $event"
+        >
+            <!-- 프로젝트 리스트 페이지이므로 프로젝트 선택 셀렉터는 숨김 -->
+            <template #project-options></template>
+        </SearchFilterBar>
+
         <!-- 메인 카드 -->
         <section class="rounded-lg bg-white p-6 shadow space-y-6 min-h-[400px]">
             <!-- 로딩 상태 -->
-            <div
+            <LoadingSpinner
                 v-if="isLoading"
-                class="flex flex-col items-center justify-center py-20"
-            >
-                <div
-                    class="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"
-                ></div>
-                <p class="mt-4 text-sm text-gray-500">
-                    프로젝트 목록을 불러오는 중입니다...
-                </p>
-            </div>
+                message="프로젝트 목록을 불러오는 중입니다..."
+            />
 
             <!-- 에러 상태 -->
             <div
@@ -116,7 +172,7 @@ onMounted(() => {
             <Table
                 v-else
                 :columns="tableColumns"
-                :data="projects"
+                :data="filteredProjects"
                 v-model:items-per-page="itemsPerPage"
                 pagination-mode="client"
                 @row-click="handleRowClick"
@@ -126,6 +182,21 @@ onMounted(() => {
                         {{ value }}
                     </code>
                 </template>
+
+                <!-- 상태 (TC Count 기반) -->
+                <template #cell-status="{item}">
+                    <span
+                        class="px-2 py-0.5 rounded text-xs font-medium"
+                        :class="
+                            item.tc_count > 0
+                                ? 'bg-green-50 text-green-700'
+                                : 'bg-gray-100 text-gray-500'
+                        "
+                    >
+                        {{ item.tc_count > 0 ? "Active" : "Archived" }}
+                    </span>
+                </template>
+
                 <template #cell-service_type="{value}">
                     <span
                         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
@@ -141,6 +212,27 @@ onMounted(() => {
                 <template #cell-tc_count="{value}">
                     <span class="badge badge-green">
                         {{ formatNumber(value) }}
+                    </span>
+                </template>
+
+                <!-- 날짜 필드 -->
+                <template #cell-created_at="{value}">
+                    <span class="text-gray-500 text-xs">{{
+                        formatDate(value)
+                    }}</span>
+                </template>
+                <template #cell-updated_at="{value}">
+                    <span class="text-gray-500 text-xs">{{
+                        formatDate(value)
+                    }}</span>
+                </template>
+
+                <!-- 사용 여부 (하드코딩) -->
+                <template #cell-is_active>
+                    <span
+                        class="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700"
+                    >
+                        사용
                     </span>
                 </template>
             </Table>

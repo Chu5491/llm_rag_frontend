@@ -1,28 +1,90 @@
 <script setup lang="ts">
-import {ref, onMounted, onUnmounted} from "vue";
+import {ref, onMounted, onUnmounted, watch} from "vue";
 import {useRoute, RouterLink} from "vue-router";
 import {checkApiStatus as apiCheck} from "../services/api.js";
 
 const route = useRoute();
 
 // 네비게이션 아이템 정의
-
 const navItems = [
     {path: "/", name: "Dashboard", icon: "dashboard"},
-    {path: "/project", name: "프로젝트 관리", icon: "folder"},
-    {path: "/generate", name: "TC 자동생성", icon: "auto_awesome"},
-    {path: "/testcase", name: "TC 관리", icon: "list_alt"},
-    {path: "/setting", name: "환경설정", icon: "settings"},
+    {
+        name: "테스트케이스 관리",
+        icon: "auto_awesome",
+        children: [
+            {path: "/generate/new", name: "TC 자동 생성"},
+            {path: "/generate", name: "TC 생성 이력"},
+            {path: "/testcase", name: "TC 목록"},
+            {path: "/testcase/duplicate", name: "중복 TC 확인 (TBD)"},
+        ],
+    },
+    {
+        name: "프로젝트 관리",
+        icon: "folder",
+        children: [{path: "/project", name: "프로젝트 목록"}],
+    },
+    {
+        name: "시스템 관리",
+        icon: "settings",
+        children: [{path: "/setting", name: "환경설정"}],
+    },
 ];
 
-const isActive = (path: string) => {
-    if (path === "/") {
-        return route.path === "/";
+const expandedMenus = ref<string[]>(["테스트케이스 관리"]); // Default expand
+
+const toggleMenu = (name: string) => {
+    if (expandedMenus.value.includes(name)) {
+        expandedMenus.value = expandedMenus.value.filter((n) => n !== name);
+    } else {
+        expandedMenus.value.push(name);
     }
-    return route.path === path || route.path.startsWith(`${path}/`);
 };
 
-// API 상태 체크 로직
+const isActive = (path?: string) => {
+    if (!path) return false;
+    // 1. Exact match (가장 우선)
+    if (route.path === path) return true;
+
+    // 2. Dashboard 예외 처리
+    if (path === "/") return false;
+
+    // 3. Prefix match (하위/상세 페이지)
+    if (route.path.startsWith(`${path}/`)) {
+        if (path === "/generate" && route.path.startsWith("/generate/new")) {
+            return false;
+        }
+        if (path === "/project" && route.path.startsWith("/project/new")) {
+            return false;
+        }
+
+        return true;
+    }
+    return false;
+};
+
+// 현재 라우트에 맞춰 메뉴 자동 펼치기
+const autoExpandMenu = () => {
+    for (const item of navItems) {
+        if (item.children) {
+            const hasActiveChild = item.children.some((child) =>
+                isActive(child.path)
+            );
+            if (hasActiveChild && !expandedMenus.value.includes(item.name)) {
+                expandedMenus.value.push(item.name);
+            }
+        }
+    }
+};
+
+watch(
+    () => route.path,
+    () => {
+        autoExpandMenu();
+    },
+    {immediate: true}
+);
+
+// ... API Status logic unchanged ...
 const apiStatus = ref<"online" | "offline" | "checking">("checking");
 let statusInterval: number | undefined;
 
@@ -41,8 +103,6 @@ onUnmounted(() => {
         clearInterval(statusInterval);
     }
 });
-
-// Material Icons 사용
 </script>
 
 <template>
@@ -65,29 +125,73 @@ onUnmounted(() => {
 
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-            <RouterLink
-                v-for="item in navItems"
-                :key="item.path"
-                :to="item.path"
-                class="group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200"
-                :class="[
-                    isActive(item.path)
-                        ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                ]"
-            >
-                <!-- Material Icon -->
-                <span
-                    class="material-symbols-outlined mr-3 text-xl transition-colors"
-                    :class="
+            <template v-for="item in navItems" :key="item.name">
+                <!-- 1. Single Item -->
+                <RouterLink
+                    v-if="!item.children"
+                    :to="item.path!"
+                    class="group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200"
+                    :class="[
                         isActive(item.path)
-                            ? 'text-indigo-600'
-                            : 'text-gray-400 group-hover:text-gray-500'
-                    "
-                    >{{ item.icon }}</span
+                            ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                    ]"
                 >
-                {{ item.name }}
-            </RouterLink>
+                    <span
+                        class="material-symbols-outlined mr-3 text-xl transition-colors"
+                        :class="
+                            isActive(item.path)
+                                ? 'text-indigo-600'
+                                : 'text-gray-400 group-hover:text-gray-500'
+                        "
+                        >{{ item.icon }}</span
+                    >
+                    {{ item.name }}
+                </RouterLink>
+
+                <!-- 2. Parent Item with Children -->
+                <div v-else class="space-y-1">
+                    <button
+                        @click="toggleMenu(item.name)"
+                        class="w-full group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200"
+                    >
+                        <div class="flex items-center">
+                            <span
+                                class="material-symbols-outlined mr-3 text-xl text-gray-400 group-hover:text-gray-500"
+                                >{{ item.icon }}</span
+                            >
+                            {{ item.name }}
+                        </div>
+                        <span
+                            class="material-symbols-outlined text-gray-400 text-lg transition-transform duration-200"
+                            :class="{
+                                'rotate-180': expandedMenus.includes(item.name),
+                            }"
+                            >expand_more</span
+                        >
+                    </button>
+
+                    <!-- Children List -->
+                    <div
+                        v-show="expandedMenus.includes(item.name)"
+                        class="pl-11 space-y-1"
+                    >
+                        <RouterLink
+                            v-for="child in item.children"
+                            :key="child.path"
+                            :to="child.path"
+                            class="block px-3 py-2 text-sm font-medium rounded-md transition-colors"
+                            :class="[
+                                isActive(child.path)
+                                    ? 'text-indigo-600 bg-indigo-50'
+                                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50',
+                            ]"
+                        >
+                            {{ child.name }}
+                        </RouterLink>
+                    </div>
+                </div>
+            </template>
         </nav>
 
         <!-- Sidebar Footer (API Status) -->

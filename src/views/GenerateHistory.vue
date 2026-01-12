@@ -1,6 +1,7 @@
 ```
 <script setup lang="ts">
 import {ref, computed, onMounted, onUnmounted, watch} from "vue";
+import {useRoute, useRouter} from "vue-router";
 import {
     fetchHistories,
     fetchHistoryDetail,
@@ -9,6 +10,7 @@ import {
     retryGeneration,
 } from "../services/historyApi.js";
 import {fetchProjects} from "../services/projectApi.js";
+import {useAlert} from "../composables/useAlert.js";
 
 import type {
     GenerationItem,
@@ -16,9 +18,11 @@ import type {
     HistoryDetailResponse,
 } from "../types/Generate.js";
 import type {ProjectResponse} from "../types/project.js";
-import Table, {type Column} from "../components/Table.vue";
 import DateRangePicker from "../components/DateRangePicker.vue";
+import SearchFilterBar from "../components/SearchFilterBar.vue";
+import LoadingSpinner from "../components/LoadingSpinner.vue";
 
+// 상태
 // 상태
 const histories = ref<GenerationItem[]>([]);
 const selectedHistoryId = ref<number | null>(null);
@@ -31,11 +35,43 @@ const stopPolling = ref<() => void>(); // 폴링 중지 함수
 const detailRequestSeq = ref(0);
 const POLL_INTERVAL_MS = 3000;
 const itemsPerPage = ref(10); // 테이블 페이지네이션
-const searchQuery = ref(""); // 검색어
-const selectedStatus = ref<"all" | GenerationStatus>("all"); // 상태 필터
-const selectedProjectId = ref<number | "all">("all"); // 프로젝트 필터
+
+const route = useRoute();
+const router = useRouter();
+const {showAlert, showConfirm} = useAlert();
+
+// URL Query에서 초기값 로드
+const getQueryParam = (key: string) => {
+    const val = route.query[key];
+    return val ? String(val) : "";
+};
+const getQueryNumber = (key: string) => {
+    const val = route.query[key];
+    return val ? Number(val) : null;
+};
+
+const pidParam = getQueryNumber("pid");
+const searchQuery = ref(getQueryParam("q")); // 검색어
+const selectedStatus = ref<"all" | GenerationStatus>("all"); // 상태 필터 (URL sync optional? Not requested but good consistency)
+const selectedProjectId = ref<number | "all">(
+    pidParam !== null ? pidParam : "all"
+); // 프로젝트 필터
+
+// URL 동기화
+watch([selectedProjectId, searchQuery], () => {
+    router.replace({
+        query: {
+            ...route.query,
+            pid:
+                selectedProjectId.value === "all"
+                    ? undefined
+                    : selectedProjectId.value,
+            q: searchQuery.value || undefined,
+        },
+    });
+});
+
 const projects = ref<ProjectResponse[]>([]); // 프로젝트 목록
-const isFilterOpen = ref(false); // 필터 팝업 표시
 const detailMode = ref<"logs" | "report" | null>(null); // 상세 표시 모드
 const displayLimit = ref(5); // 현재 표시할 항목 수
 
@@ -254,6 +290,7 @@ const groupedHistories = computed(() => {
     // 표시 제한 적용
     const sliced = sorted.slice(0, displayLimit.value);
 
+    // --- 검색 및 필터 상태 ---
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
@@ -292,11 +329,6 @@ const groupedHistories = computed(() => {
 });
 
 // ------------- UI 유틸리티 -------------
-
-const isCompleted = (
-    status: GenerationStatus
-): status is "success" | "failed" =>
-    status === "success" || status === "failed";
 
 const getStatusColorClass = (status: GenerationStatus) => {
     if (status === "running") return "text-blue-500 bg-blue-50 border-blue-100";
@@ -387,32 +419,28 @@ const handleHistoryClick = async (
 
 // 사용자 액션
 const handleCancel = async (id: number) => {
-    if (!confirm("정말로 작업을 중단하시겠습니까?")) return;
+    const confirmed = await showConfirm(
+        "정말로 작업을 중단하시겠습니까?",
+        "확인"
+    );
+    if (!confirmed) return;
     try {
         await cancelGeneration(id);
         loadHistories();
     } catch (err) {
-        alert("작업 중단 실패");
+        showAlert("작업 중단 실패", "오류");
     }
 };
 const handleRetry = async (id: number) => {
-    if (!confirm("재실행하시겠습니까?")) return;
+    const confirmed = await showConfirm("재실행하시겠습니까?", "확인");
+    if (!confirmed) return;
     try {
         await retryGeneration(id);
         loadHistories();
     } catch (err) {
-        alert("재실행 실패");
+        showAlert("재실행 실패", "오류");
     }
 };
-
-// 테이블 컬럼 정의
-const historyDetailColumns: Column[] = [
-    {key: "testcase_id", label: "ID", width: "w-32", sortable: true},
-    {key: "title", label: "제목", sortable: true},
-    {key: "module", label: "기능", sortable: true},
-    {key: "priority", label: "우선순위", width: "w-32", sortable: true},
-    {key: "expected_result", label: "예상 결과", sortable: false},
-];
 </script>
 
 <template>
@@ -447,165 +475,110 @@ const historyDetailColumns: Column[] = [
         </header>
 
         <!-- 검색 및 필터 -->
-        <div
-            class="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-lg border border-gray-200 shadow-sm"
+        <SearchFilterBar
+            :search-query="searchQuery"
+            search-placeholder="Search by activity name..."
+            :projects="projects"
+            :selected-project-id="selectedProjectId"
+            :is-filter-active="
+                selectedStatus !== 'all' || !!dateRange.start || !!dateRange.end
+            "
+            @update:search-query="searchQuery = $event"
+            @update:selected-project-id="selectedProjectId = $event as any"
+            @reset="
+                selectedStatus = 'all';
+                dateRange = {start: '', end: ''};
+            "
         >
-            <div class="relative flex-1 w-full">
-                <span
-                    class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"
-                >
-                    <span class="material-icons-outlined">search</span>
-                </span>
-                <input
-                    :value="searchQuery"
-                    @input="
-                        searchQuery = ($event.target as HTMLInputElement).value
-                    "
-                    type="text"
-                    placeholder="Search by activity name..."
-                    class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 transition-all text-gray-800"
-                />
-            </div>
+            <template #project-options>
+                <option value="all">전체 프로젝트</option>
+                <option v-for="p in projects" :key="p.id" :value="p.id">
+                    {{ p.name }}
+                </option>
+            </template>
 
-            <!-- 프로젝트 필터 -->
-            <div class="hidden md:block w-48 shrink-0">
-                <select
-                    v-model="selectedProjectId"
-                    class="w-full text-sm border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2 pl-3 pr-8 shadow-sm cursor-pointer hover:bg-gray-50"
-                >
-                    <option value="all">전체 프로젝트</option>
-                    <option v-for="p in projects" :key="p.id" :value="p.id">
-                        {{ p.name }}
-                    </option>
-                </select>
-            </div>
-
-            <div class="h-6 w-px bg-gray-300 mx-1 hidden md:block"></div>
-
-            <div class="relative">
-                <button
-                    @click="isFilterOpen = !isFilterOpen"
-                    class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700 transition-colors shadow-sm"
-                >
-                    <span class="material-icons-outlined text-gray-500"
-                        >filter_list</span
+            <template #filters>
+                <!-- Date Range -->
+                <div>
+                    <label
+                        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"
+                        >Date Range</label
                     >
-                    <span class="text-sm font-medium">필터</span>
-                    <span
-                        v-if="
-                            selectedStatus !== 'all' ||
-                            dateRange.start ||
-                            dateRange.end
-                        "
-                        class="flex h-2 w-2 rounded-full bg-indigo-500"
-                    ></span>
-                </button>
+                    <DateRangePicker v-model="dateRange" />
+                </div>
 
-                <div
-                    v-if="isFilterOpen"
-                    class="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-100 z-10 p-4"
-                >
-                    <div
-                        class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2"
+                <!-- Status Filter -->
+                <div>
+                    <label
+                        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"
+                        >Status</label
                     >
-                        <h3 class="font-medium text-gray-900">Filters</h3>
+                    <div class="grid grid-cols-2 gap-2">
                         <button
-                            @click="
-                                selectedStatus = 'all';
-                                dateRange = {start: '', end: ''};
+                            @click="selectedStatus = 'all'"
+                            class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
+                            :class="
+                                selectedStatus === 'all'
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                             "
-                            class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
                         >
-                            Reset
+                            전체
+                        </button>
+                        <button
+                            @click="selectedStatus = 'success'"
+                            class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
+                            :class="
+                                selectedStatus === 'success'
+                                    ? 'bg-green-50 border-green-200 text-green-700'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            "
+                        >
+                            성공
+                        </button>
+                        <button
+                            @click="selectedStatus = 'failed'"
+                            class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
+                            :class="
+                                selectedStatus === 'failed'
+                                    ? 'bg-red-50 border-red-200 text-red-700'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            "
+                        >
+                            실패
+                        </button>
+                        <button
+                            @click="selectedStatus = 'running'"
+                            class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
+                            :class="
+                                selectedStatus === 'running'
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            "
+                        >
+                            실행중
+                        </button>
+                        <button
+                            @click="selectedStatus = 'cancelled'"
+                            class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all col-span-2"
+                            :class="
+                                selectedStatus === 'cancelled'
+                                    ? 'bg-gray-100 border-gray-300 text-gray-700'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            "
+                        >
+                            취소
                         </button>
                     </div>
-
-                    <div class="space-y-4">
-                        <!-- Date Range -->
-                        <div>
-                            <label
-                                class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"
-                                >Date Range</label
-                            >
-                            <!-- 날짜 선택기 -->
-                            <DateRangePicker v-model="dateRange" />
-                        </div>
-
-                        <!-- Status Filter -->
-                        <div>
-                            <label
-                                class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"
-                                >Status</label
-                            >
-                            <div class="grid grid-cols-2 gap-2">
-                                <button
-                                    @click="selectedStatus = 'all'"
-                                    class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
-                                    :class="
-                                        selectedStatus === 'all'
-                                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    "
-                                >
-                                    전체
-                                </button>
-                                <button
-                                    @click="selectedStatus = 'success'"
-                                    class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
-                                    :class="
-                                        selectedStatus === 'success'
-                                            ? 'bg-green-50 border-green-200 text-green-700'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    "
-                                >
-                                    성공
-                                </button>
-                                <button
-                                    @click="selectedStatus = 'failed'"
-                                    class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
-                                    :class="
-                                        selectedStatus === 'failed'
-                                            ? 'bg-red-50 border-red-200 text-red-700'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    "
-                                >
-                                    실패
-                                </button>
-                                <button
-                                    @click="selectedStatus = 'running'"
-                                    class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all"
-                                    :class="
-                                        selectedStatus === 'running'
-                                            ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    "
-                                >
-                                    실행중
-                                </button>
-                                <button
-                                    @click="selectedStatus = 'cancelled'"
-                                    class="px-3 py-1.5 rounded text-xs font-medium border text-center transition-all col-span-2"
-                                    :class="
-                                        selectedStatus === 'cancelled'
-                                            ? 'bg-gray-100 border-gray-300 text-gray-700'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    "
-                                >
-                                    취소
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </SearchFilterBar>
 
         <!-- 본문 -->
-        <div v-if="isLoading" class="flex justify-center py-20">
-            <div
-                class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"
-            ></div>
-        </div>
+        <LoadingSpinner
+            v-if="isLoading"
+            message="히스토리 목록을 불러오는 중입니다..."
+        />
 
         <div v-else-if="error" class="text-center py-20">
             <span class="material-icons-outlined text-4xl text-red-400"
@@ -780,21 +753,9 @@ const historyDetailColumns: Column[] = [
                                     >
                                         <div class="flex flex-col min-w-0">
                                             <span
-                                                class="text-xs text-gray-400 font-medium uppercase truncate block"
-                                                :title="
-                                                    item.status === 'failed' ||
-                                                    item.status === 'cancelled'
-                                                        ? 'Result Note'
-                                                        : 'Generated TC Count'
-                                                "
+                                                class="text-xs text-gray-400 font-medium uppercase"
+                                                >작업 내용</span
                                             >
-                                                {{
-                                                    item.status === "failed" ||
-                                                    item.status === "cancelled"
-                                                        ? "Result Note"
-                                                        : "Generated TC Count"
-                                                }}
-                                            </span>
                                             <span
                                                 class="text-sm text-gray-700 font-medium"
                                             >
@@ -810,7 +771,7 @@ const historyDetailColumns: Column[] = [
                                         <div class="flex flex-col">
                                             <span
                                                 class="text-xs text-gray-400 font-medium uppercase"
-                                                >Start Time</span
+                                                >작업 시작 시간</span
                                             >
                                             <span
                                                 class="text-sm text-gray-700"
@@ -823,7 +784,7 @@ const historyDetailColumns: Column[] = [
                                         <div class="flex flex-col">
                                             <span
                                                 class="text-xs text-gray-400 font-medium uppercase"
-                                                >Duration</span
+                                                >소요 시간</span
                                             >
                                             <span
                                                 class="text-sm text-gray-700 font-mono"
@@ -858,8 +819,8 @@ const historyDetailColumns: Column[] = [
                                     {{
                                         selectedHistoryId === item.id &&
                                         detailMode === "logs"
-                                            ? "Hide Logs"
-                                            : "Show Logs"
+                                            ? "로그 숨기기"
+                                            : "로그 보기"
                                     }}
                                 </button>
 
@@ -879,7 +840,7 @@ const historyDetailColumns: Column[] = [
                                         class="material-icons-outlined text-lg"
                                         >bar_chart</span
                                     >
-                                    Report
+                                    작업 결과
                                 </button>
                                 <button
                                     v-else-if="item.status === 'running'"
@@ -890,7 +851,7 @@ const historyDetailColumns: Column[] = [
                                         class="material-icons-outlined text-lg"
                                         >stop_circle</span
                                     >
-                                    Stop
+                                    중지
                                 </button>
                                 <button
                                     v-else
@@ -901,7 +862,7 @@ const historyDetailColumns: Column[] = [
                                         class="material-icons-outlined text-lg"
                                         >refresh</span
                                     >
-                                    Retry
+                                    재시도
                                 </button>
                             </div>
                         </div>

@@ -8,8 +8,6 @@ import {
 import type {AppConfigResponse} from "../types/config.js";
 import type {OllamaModel} from "../types/ollama.js";
 
-const isExternalSystem = ref(false);
-const isEnglish = ref(true);
 const isFigma = ref(false);
 
 const ragBatchSize = ref(3);
