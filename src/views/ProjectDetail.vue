@@ -2,8 +2,15 @@
 import {ref, onMounted} from "vue";
 import {useRoute, useRouter} from "vue-router";
 import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
+import {formatDate, formatFileSize} from "../utils/format.js";
 import {fetchProjectDetail} from "../services/projectApi.js";
 import type {ProjectResponse} from "../types/project.js";
+import {
+    ARTIFACT_TYPES,
+    ARTIFACT_LABELS,
+    ARTIFACT_ICONS,
+    type ArtifactType,
+} from "../types/project.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -25,9 +32,14 @@ const loadProjectDetail = async () => {
 
     try {
         project.value = await fetchProjectDetail(projectId);
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("프로젝트 상세 로드 실패:", e);
-        error.value = "프로젝트 정보를 불러오는 데 실패했습니다.";
+        if (e instanceof Error) {
+             // API 클라이언트에서 던진 에러 메시지 사용
+            error.value = e.message;
+        } else {
+            error.value = "프로젝트 정보를 불러오는 데 실패했습니다.";
+        }
     } finally {
         isLoading.value = false;
     }
@@ -43,36 +55,6 @@ const getSystemIcon = (systemType: string) => {
     };
     return icons[systemType] || "•";
 };
-
-// 날짜 포맷팅
-const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-    };
-    return new Date(dateString).toLocaleDateString("ko-KR", options);
-};
-
-// 파일 크기 포맷팅
-const formatFileSize = (bytes: number | undefined) => {
-    if (bytes === undefined || bytes === null) return "";
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
-
-import {
-    ARTIFACT_TYPES,
-    ARTIFACT_LABELS,
-    ARTIFACT_ICONS,
-    type ArtifactType,
-} from "../types/project.js";
 
 // 카테고리 표시 순서
 const ORDERED_CATEGORIES: ArtifactType[] = [

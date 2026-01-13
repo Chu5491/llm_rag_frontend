@@ -860,29 +860,29 @@ const handleGenerate = async () => {
                                 >
                                     {{
                                         ARTIFACT_LABELS[
-                                            type as keyof typeof ARTIFACT_LABELS
+                                                String(type) as keyof typeof ARTIFACT_LABELS
                                         ] || type
                                     }}
                                 </span>
                                 <span
                                     class="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[10px] text-gray-500 font-medium"
                                 >
-                                    {{ getArtifactCount(type) }}
+                                        {{ getArtifactCount(String(type)) }}
                                 </span>
                             </div>
                             <div
                                 class="flex items-center gap-2 cursor-pointer"
-                                @click="toggleCategory(type)"
+                                    @click="toggleCategory(String(type))"
                             >
                                 <span class="text-xs text-gray-500">{{
-                                    isCategorySelected(type)
+                                        isCategorySelected(String(type))
                                         ? "전체 해제"
                                         : "전체 선택"
                                 }}</span>
                                 <div
                                     class="custom-toggle"
                                     :class="
-                                        isCategorySelected(type)
+                                            isCategorySelected(String(type))
                                             ? 'custom-toggle-active'
                                             : 'custom-toggle-inactive'
                                     "
@@ -890,7 +890,7 @@ const handleGenerate = async () => {
                                     <span
                                         class="custom-toggle-circle"
                                         :class="
-                                            isCategorySelected(type)
+                                                isCategorySelected(String(type))
                                                 ? 'custom-toggle-circle-on'
                                                 : 'custom-toggle-circle-off'
                                         "

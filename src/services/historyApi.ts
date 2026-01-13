@@ -1,3 +1,4 @@
+import { apiClient } from "./apiClient.js";
 import type {
     GenerationItem,
     HistoryDetailResponse,
@@ -10,13 +11,9 @@ export async function generateTestCases(
     endpoint: "/api/v1/rag/generate/file" | "/api/v1/rag/generate/figma",
     model = "exaone3.5:2.4b"
 ) {
-    const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({model}),
-    });
-    if (!res.ok) throw new Error("generate API failed");
-    return res.json();
+    // endpoint에서 BASE_URL(/api/v1) 부분 제거
+    const path = endpoint.replace("/api/v1", "");
+    return apiClient.post(path, { model });
 }
 
 // Figma 연동 정보 및 상태 확인
@@ -24,61 +21,27 @@ export async function checkFigmaPersist(
     url?: string,
     pat?: string
 ): Promise<any> {
-    const res = await fetch("/api/v1/figma/info", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            url,
-            pat,
-        }),
-    });
-
-    if (!res.ok) {
-        let message = "Figma 연동 체크에 실패했습니다.";
-
-        try {
-            const data = await res.json();
-            if (data && data.detail) {
-                message =
-                    typeof data.detail === "string"
-                        ? data.detail
-                        : JSON.stringify(data.detail);
-            }
-        } catch {
-            // json 파싱 실패하면 기본 메시지 그대로 사용
-        }
-
-        throw new Error(message);
-    }
-
-    return res.json();
+    return apiClient.post("/figma/info", { url, pat });
 }
 
 // 히스토리 목록 조회
 export async function fetchHistories(
     projectId?: number
 ): Promise<GenerationItem[]> {
-    const url = projectId
-        ? `/api/v1/history?project_id=${projectId}`
-        : "/api/v1/history";
-    const res = await fetch(url);
-    if (!res.ok) {
-        throw new Error("히스토리 조회에 실패했습니다.");
+    const params: Record<string, any> = {};
+    if (projectId) {
+        params.project_id = projectId;
     }
-    return res.json();
+    return apiClient.get<GenerationItem[]>("/history", { params });
 }
 
 // 히스토리 상세 조회
 export async function fetchHistoryDetail(
     id: number
 ): Promise<HistoryDetailResponse> {
-    const res = await fetch(`/api/v1/history/${id}?polling=true`);
-    if (!res.ok) {
-        throw new Error("히스토리 상세 정보 조회에 실패했습니다.");
-    }
-    return res.json();
+    return apiClient.get<HistoryDetailResponse>(`/history/${id}`, {
+        params: { polling: true },
+    });
 }
 
 // 진행중인 항목 상태 주기적 조회 (Polling)
@@ -121,41 +84,17 @@ export function pollRunningItems(
 export const startGeneration = async (
     data: StartGenerationRequest
 ): Promise<StartGenerationResponse> => {
-    const response = await fetch(`/api/v1/rag/generate/all`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
+    return apiClient.post<StartGenerationResponse>("/rag/generate/all", data, {
         credentials: "include",
     });
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(
-            error.message || "자동 생성 시작 중 오류가 발생했습니다."
-        );
-    }
-    return response.json();
 };
 
 // 작업 중단
 export async function cancelGeneration(historyId: number): Promise<any> {
-    const res = await fetch(`/api/v1/history/cancel/${historyId}`, {
-        method: "POST",
-    });
-    if (!res.ok) {
-        throw new Error("작업 중단에 실패했습니다.");
-    }
-    return res.json();
+    return apiClient.post(`/history/cancel/${historyId}`);
 }
 
 // 작업 재시도
 export async function retryGeneration(historyId: number): Promise<any> {
-    const res = await fetch(`/api/v1/history/${historyId}/retry`, {
-        method: "POST",
-    });
-    if (!res.ok) {
-        throw new Error("재시도에 실패했습니다.");
-    }
-    return res.json();
+    return apiClient.post(`/history/${historyId}/retry`);
 }
