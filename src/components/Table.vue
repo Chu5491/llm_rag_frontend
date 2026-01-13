@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends Record<string, any>">
 import {ref, computed, watch} from "vue";
 import SortIndicator from "./SortIndicator.vue";
 
@@ -14,7 +14,7 @@ export interface Column {
 const props = withDefaults(
     defineProps<{
         columns: Column[];
-        data: any[];
+        data: T[];
         itemsPerPage?: number;
         expandable?: boolean;
         rowKey?: string;
@@ -36,12 +36,12 @@ const props = withDefaults(
     }
 );
 
-const emit = defineEmits([
-    "row-click",
-    "update:currentPage", // 페이지 변경 (Server mode)
-    "update:itemsPerPage", // 개수 변경
-    "update:sort", // 정렬 변경 (Server mode)
-]);
+const emit = defineEmits<{
+    (e: "row-click", item: T): void;
+    (e: "update:currentPage", page: number): void;
+    (e: "update:itemsPerPage", count: number): void;
+    (e: "update:sort", sort: {key: string; order: "asc" | "desc"}): void;
+}>();
 
 // Rows Per Page Options
 const rowsPerPageOptions = [5, 10, 20, 50, 100];
@@ -80,8 +80,6 @@ const currentPageValue = computed(() =>
 );
 
 // 데이터 변경 시 Client Page 리셋 여부
-// 데이터가 완전히 교체될 때 페이지를 유지할지 1로 갈지는 정책 결정 필요.
-// 여기서는 안전하게 1로 리셋하지 않고 유지하되, 범위 벗어나면 조정.
 watch(
     () => props.data.length,
     () => {
@@ -97,7 +95,7 @@ watch(
 );
 
 // --- Processed Data (Sorting & Pagination for Client Mode) ---
-const processedData = computed(() => {
+const processedData = computed<T[]>(() => {
     if (props.paginationMode === "server") {
         return props.data;
     }
@@ -167,7 +165,7 @@ const toggleSort = (key: string) => {
 };
 
 // 행 클릭
-const handleRowClick = (item: any) => {
+const handleRowClick = (item: T) => {
     emit("row-click", item);
 };
 
@@ -337,15 +335,17 @@ const getAlignClass = (align?: string) => {
                                 :colspan="columns.length + (expandable ? 1 : 0)"
                                 class="px-4 py-12 text-center text-gray-500"
                             >
-                                <div
-                                    class="flex flex-col items-center justify-center gap-2"
-                                >
-                                    <span
-                                        class="material-icons-outlined text-4xl text-gray-300"
-                                        >inbox</span
+                                <slot name="empty">
+                                    <div
+                                        class="flex flex-col items-center justify-center gap-2"
                                     >
-                                    <p>데이터가 없습니다.</p>
-                                </div>
+                                        <span
+                                            class="material-icons-outlined text-4xl text-gray-300"
+                                            >inbox</span
+                                        >
+                                        <p>데이터가 없습니다.</p>
+                                    </div>
+                                </slot>
                             </td>
                         </tr>
                     </template>
