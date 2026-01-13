@@ -1,8 +1,9 @@
-import { apiClient } from "./apiClient.js";
+import {apiClient} from "./apiClient.js";
 import type {
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
+    FeatureCreate,
 } from "../types/project.js";
 
 // 프로젝트 생성 (FormData 사용)
@@ -53,8 +54,8 @@ export async function fetchProjects(
     skip = 0,
     limit = 100
 ): Promise<ProjectResponse[]> {
-    const params = { skip, limit };
-    return apiClient.get<ProjectResponse[]>("/projects/", { params });
+    const params = {skip, limit};
+    return apiClient.get<ProjectResponse[]>("/projects/", {params});
 }
 
 // 프로젝트 상세 조회
@@ -67,9 +68,67 @@ export async function fetchProjectDetail(
 // 프로젝트 수정
 export async function updateProject(
     projectId: number,
-    data: ProjectUpdate
+    data: ProjectUpdate & {
+        artifacts?: any[];
+        external_systems?: any[];
+        features?: FeatureCreate[];
+    }
 ): Promise<ProjectResponse> {
-    return apiClient.put<ProjectResponse>(`/projects/${projectId}`, data);
+    const formData = new FormData();
+
+    // 1. 기본 필드 (Backend: name, service_type, description)
+    if (data.name) formData.append("name", data.name);
+    if (data.service_type) formData.append("service_type", data.service_type);
+    // description이 빈 문자열일 수도 있으므로 undefined 체크
+    if (data.description !== undefined) {
+        formData.append("description", data.description);
+    }
+
+    // 2. Features (기능 분류)
+    // Note: 전달받은 백엔드 스펙에는 없으나, 프론트엔드 기능 유지를 위해 전송 (백엔드에서 무시 가능)
+    if (data.features) {
+        formData.append("features_json", JSON.stringify(data.features));
+    }
+
+    // 3. Artifacts (새로 추가된 파일 및 메타데이터)
+    // Backend: artifacts_json (str), files (List[UploadFile])
+    if (data.artifacts) {
+        const processedArtifacts = data.artifacts.map((artifact) => {
+            if (artifact.file) {
+                // files 키로 파일 전송 (FastAPI List[UploadFile] 매핑)
+                formData.append("files", artifact.file);
+                // JSON 메타데이터에서는 파일 객체 제외 및 name 설정
+                return {
+                    ...artifact,
+                    id: undefined,
+                    name: artifact.file.name,
+                    file_name: artifact.file.name,
+                    file: undefined,
+                };
+            }
+            return artifact;
+        });
+        formData.append("artifacts_json", JSON.stringify(processedArtifacts));
+    }
+
+    // 4. External Systems (외부 시스템 설정)
+    // Backend: external_systems_json (str)
+    if (data.external_systems) {
+        const processedExternalSystems = data.external_systems.map((sys) => {
+            // UI의 'connected' 상태를 백엔드의 'completed'로 매핑
+            if (sys.status === "connected") {
+                return {...sys, status: "completed"};
+            }
+            return sys;
+        });
+        formData.append(
+            "external_systems_json",
+            JSON.stringify(processedExternalSystems)
+        );
+    }
+
+    // 5. API 전송
+    return apiClient.put<ProjectResponse>(`/projects/${projectId}`, formData);
 }
 
 // 프로젝트 삭제

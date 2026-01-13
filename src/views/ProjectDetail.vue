@@ -35,7 +35,7 @@ const loadProjectDetail = async () => {
     } catch (e: unknown) {
         console.error("프로젝트 상세 로드 실패:", e);
         if (e instanceof Error) {
-             // API 클라이언트에서 던진 에러 메시지 사용
+            // API 클라이언트에서 던진 에러 메시지 사용
             error.value = e.message;
         } else {
             error.value = "프로젝트 정보를 불러오는 데 실패했습니다.";
@@ -127,7 +127,16 @@ onMounted(() => {
                     등록된 프로젝트의 상세 정보를 확인할 수 있습니다.
                 </p>
             </div>
-            <button @click="goBack" class="btn-primary">뒤로 가기</button>
+            <div class="flex gap-2">
+                <button
+                    @click="router.push(`/project/update/${route.params.id}`)"
+                    class="btn-secondary flex items-center gap-1"
+                >
+                    <span class="material-icons-outlined text-sm">edit</span>
+                    수정
+                </button>
+                <button @click="goBack" class="btn-primary">뒤로 가기</button>
+            </div>
         </header>
 
         <!-- 로딩 상태 -->

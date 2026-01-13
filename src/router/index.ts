@@ -31,6 +31,11 @@ const routes: Array<RouteRecordRaw> = [
         component: ProjectDetail,
     },
     {
+        path: "/project/update/:id",
+        name: "ProjectUpdate",
+        component: () => import("../views/ProjectUpdate.vue"),
+    },
+    {
         path: "/generate",
         name: "GenerateHistory",
         component: GenerateHistory,

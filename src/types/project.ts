@@ -79,6 +79,7 @@ export interface ProjectBase {
 export interface ArtifactCreate {
     artifact_type: string;
     name: string;
+    file_name: string | null;
     has_file: boolean;
     file_size?: number;
     id?: number; // UI only
@@ -95,6 +96,11 @@ export interface ExternalSystemCreate {
     label?: string; // UI Only
     description?: string; // UI Only
     status?: "idle" | "connected" | "error"; // UI Only
+}
+
+export interface FeatureCreate {
+    name: string;
+    id?: number; // Optional for UI tracking or updates
 }
 
 export interface ProjectCreate extends ProjectBase {

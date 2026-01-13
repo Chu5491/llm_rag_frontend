@@ -477,7 +477,7 @@ const handleRetry = async (id: number) => {
         <!-- 검색 및 필터 -->
         <SearchFilterBar
             :search-query="searchQuery"
-            search-placeholder="Search by activity name..."
+            search-placeholder="히스토리 명을 입력하세요..."
             :projects="projects"
             :selected-project-id="selectedProjectId"
             :is-filter-active="
