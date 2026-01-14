@@ -8,8 +8,22 @@ import TestCase from "../views/TestCase.vue";
 import TestCaseDetail from "../views/TestCaseDetail.vue";
 import ProjectDetail from "../views/ProjectDetail.vue";
 import Setting from "../views/Setting.vue";
+import LoginView from "../views/LoginView.vue";
+import RegisterView from "../views/RegisterView.vue";
 
 const routes: Array<RouteRecordRaw> = [
+    {
+        path: "/login",
+        name: "Login",
+        component: LoginView,
+        meta: {layout: "empty"},
+    },
+    {
+        path: "/register",
+        name: "Register",
+        component: RegisterView,
+        meta: {layout: "empty"},
+    },
     {
         path: "/",
         name: "Dashboard",

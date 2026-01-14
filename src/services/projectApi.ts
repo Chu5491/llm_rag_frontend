@@ -29,6 +29,8 @@ export async function createProject(
             return {
                 ...artifact,
                 name: artifact.file.name,
+                file_name: artifact.file.name,
+                source_type: artifact.source_type,
                 file: undefined, // JSON 변환 시 제외
             };
         }
@@ -103,6 +105,7 @@ export async function updateProject(
                     id: undefined,
                     name: artifact.file.name,
                     file_name: artifact.file.name,
+                    source_type: artifact.source_type,
                     file: undefined,
                 };
             }
@@ -115,10 +118,6 @@ export async function updateProject(
     // Backend: external_systems_json (str)
     if (data.external_systems) {
         const processedExternalSystems = data.external_systems.map((sys) => {
-            // UI의 'connected' 상태를 백엔드의 'completed'로 매핑
-            if (sys.status === "connected") {
-                return {...sys, status: "completed"};
-            }
             return sys;
         });
         formData.append(

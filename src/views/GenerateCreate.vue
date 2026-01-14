@@ -6,8 +6,8 @@ import type {OllamaModel} from "../types/ollama.js";
 import {
     type ProjectResponse,
     type ProjectArtifact,
-    ARTIFACT_LABELS,
-    ARTIFACT_TYPES,
+    SOURCE_LABELS,
+    SOURCE_TYPES,
 } from "../types/project.js";
 import router from "../router/index.js";
 import BaseModal from "../components/BaseModal.vue";
@@ -86,12 +86,12 @@ const groupedArtifacts = computed(() => {
     // 타입별 그룹 초기화
     const groups: Record<string, ProjectArtifact[]> = {};
 
-    Object.values(ARTIFACT_TYPES).forEach((type) => {
+    Object.values(SOURCE_TYPES).forEach((type) => {
         groups[type] = [];
     });
 
     selectedProjectDetail.value.artifacts.forEach((artifact) => {
-        const type = artifact.artifact_type || ARTIFACT_TYPES.ETC;
+        const type = artifact.source_type || SOURCE_TYPES.ETC;
         if (!groups[type]) groups[type] = [];
         groups[type].push(artifact);
     });
@@ -859,30 +859,32 @@ const handleGenerate = async () => {
                                     class="text-sm font-semibold text-gray-700"
                                 >
                                     {{
-                                        ARTIFACT_LABELS[
-                                                String(type) as keyof typeof ARTIFACT_LABELS
+                                        SOURCE_LABELS[
+                                            String(
+                                                type
+                                            ) as keyof typeof SOURCE_LABELS
                                         ] || type
                                     }}
                                 </span>
                                 <span
                                     class="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[10px] text-gray-500 font-medium"
                                 >
-                                        {{ getArtifactCount(String(type)) }}
+                                    {{ getArtifactCount(String(type)) }}
                                 </span>
                             </div>
                             <div
                                 class="flex items-center gap-2 cursor-pointer"
-                                    @click="toggleCategory(String(type))"
+                                @click="toggleCategory(String(type))"
                             >
                                 <span class="text-xs text-gray-500">{{
-                                        isCategorySelected(String(type))
+                                    isCategorySelected(String(type))
                                         ? "전체 해제"
                                         : "전체 선택"
                                 }}</span>
                                 <div
                                     class="custom-toggle"
                                     :class="
-                                            isCategorySelected(String(type))
+                                        isCategorySelected(String(type))
                                             ? 'custom-toggle-active'
                                             : 'custom-toggle-inactive'
                                     "
@@ -890,7 +892,7 @@ const handleGenerate = async () => {
                                     <span
                                         class="custom-toggle-circle"
                                         :class="
-                                                isCategorySelected(String(type))
+                                            isCategorySelected(String(type))
                                                 ? 'custom-toggle-circle-on'
                                                 : 'custom-toggle-circle-off'
                                         "

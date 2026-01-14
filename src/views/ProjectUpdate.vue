@@ -9,10 +9,10 @@ import {
     ArtifactItem,
     ExternalSystemItem,
     ProjectBase,
-    ArtifactType,
-    ARTIFACT_TYPES,
-    ARTIFACT_LABELS,
-    ARTIFACT_ICONS,
+    SourceType,
+    SOURCE_TYPES,
+    SOURCE_LABELS,
+    SOURCE_ICONS,
 } from "../types/project.js";
 import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
 
@@ -24,7 +24,6 @@ const projectId = Number(route.params.id);
 
 // 저장 상태
 const saveStatus = ref<"idle" | "saving" | "done">("idle");
-let saveTimer: number | undefined;
 let redirectTimer: number | undefined;
 
 // 프로젝트 기본 정보
@@ -60,12 +59,12 @@ const isLoading = ref(false);
 const error = ref<string | null>(null);
 
 // 카테고리 순서
-const ORDERED_CATEGORIES: ArtifactType[] = [
-    ARTIFACT_TYPES.REQUIREMENTS,
-    ARTIFACT_TYPES.SCREEN_DESIGN,
-    ARTIFACT_TYPES.API_SPEC,
-    ARTIFACT_TYPES.MANUAL,
-    ARTIFACT_TYPES.ETC,
+const ORDERED_CATEGORIES: SourceType[] = [
+    SOURCE_TYPES.REQUIREMENTS,
+    SOURCE_TYPES.SCREEN_DESIGN,
+    SOURCE_TYPES.API_SPEC,
+    SOURCE_TYPES.MANUAL,
+    SOURCE_TYPES.ETC,
 ];
 
 // 초기 데이터 로드
@@ -91,7 +90,7 @@ const loadProject = async () => {
         if (data.artifacts) {
             artifacts.value = data.artifacts.map((a) => ({
                 id: a.id,
-                artifact_type: a.artifact_type as ArtifactType,
+                source_type: a.source_type as SourceType,
                 name: a.name,
                 file_name: a.file_name,
                 has_file: a.has_file,
@@ -114,11 +113,7 @@ const loadProject = async () => {
                     target.enabled = figmaData.enabled;
                     target.url = figmaData.url || "";
 
-                    // DB의 'completed' 상태를 UI의 'connected'로 매핑 (타입 불일치 해소)
-                    const dbStatus = figmaData.status as string;
-                    target.status = (
-                        dbStatus === "completed" ? "connected" : dbStatus
-                    ) as any;
+                    target.status = (figmaData.status as any) || "idle";
 
                     target.pat = "";
                 }
@@ -148,10 +143,10 @@ const removeFeature = (index: number) => {
 
 // 파일 추가 관련
 const fileInput = ref<HTMLInputElement | null>(null);
-const targetCategory = ref<ArtifactType | null>(null);
+const targetCategory = ref<SourceType | null>(null);
 let nextArtifactTempId = 10000;
 
-const triggerFileInput = (category: ArtifactType) => {
+const triggerFileInput = (category: SourceType) => {
     if (!fileInput.value) return;
     targetCategory.value = category;
     fileInput.value.value = "";
@@ -167,7 +162,7 @@ const handleFileChange = (event: Event) => {
     const file = target.files[0];
     artifacts.value.push({
         id: nextArtifactTempId++,
-        artifact_type: targetCategory.value,
+        source_type: targetCategory.value,
         name: file.name,
         file_name: file.name,
         has_file: true,
@@ -211,14 +206,14 @@ const toggleExternalSystem = (id: ExternalSystemId) => {
         // Off -> On
         system.enabled = true;
 
-        // 이미 연동된 상태(status === 'connected')라면 팝업 없이 기존 정보 사용
+        // 이미 연동된 상태(status === 'completed')라면 팝업 없이 기존 정보 사용
         // 연동되지 않은 상태(idle, error 등)라면 팝업을 띄워 설정 유도
-        if (system.status !== "connected") {
+        if (system.status !== "completed") {
             system.pat = "";
             activeExternalPopup.value = id;
         }
     } else {
-        // On -> Off: 비활성화
+        // On -> Off: 비활성화 (상태 유지)
         system.enabled = false;
     }
 };
@@ -237,8 +232,8 @@ const cancelExternalPopup = () => {
     const system = activeExternalSystem.value;
     if (system) {
         // 연동이 완료되지 않은 상태에서 취소하면 토글 비활성화 (Create 페이지와 동일 동작)
-        // 재설정 모드(이미 connected)였다면 토글 유지
-        if (system.status !== "connected") {
+        // 재설정 모드(이미 completed)였다면 토글 유지
+        if (system.status !== "completed") {
             system.enabled = false;
         }
     }
@@ -260,7 +255,7 @@ const saveExternalConfig = async () => {
             const data = await checkFigmaPersist(system.url, system.pat);
             console.log("Figma 연결 확인:", data);
 
-            system.status = "connected";
+            system.status = "completed";
             activeExternalPopup.value = null;
 
             // 변경 플래그 설정 (재분석 경고 표시)
@@ -293,7 +288,7 @@ const handleSubmit = async () => {
             features: features.value,
             artifacts: artifacts.value.map((a) => ({
                 id: a.id && a.id < 10000 ? a.id : undefined,
-                artifact_type: a.artifact_type,
+                source_type: a.source_type,
                 name: a.name,
                 has_file: a.has_file,
                 file: a.file,
@@ -343,15 +338,7 @@ onUnmounted(() => {
                 </p>
             </div>
             <div class="flex gap-2">
-                <button
-                    type="button"
-                    @click="handleSubmit"
-                    class="btn-primary flex items-center gap-1"
-                >
-                    <span class="material-icons-outlined text-sm">save</span>
-                    수정 완료
-                </button>
-                <button @click="goBack" class="btn-secondary">취소</button>
+                <!-- Buttons are moved to bottom -->
             </div>
         </header>
 
@@ -563,7 +550,7 @@ onUnmounted(() => {
                         :key="category"
                         class="flex flex-col rounded-lg border border-gray-200 bg-white"
                         :class="{
-                            'lg:col-span-2': category === ARTIFACT_TYPES.ETC,
+                            'lg:col-span-2': category === SOURCE_TYPES.ETC,
                         }"
                     >
                         <!-- 헤더 (Detail UI + Add Button) -->
@@ -573,10 +560,10 @@ onUnmounted(() => {
                             <div class="flex items-center gap-2">
                                 <span
                                     class="material-icons-outlined text-gray-400 text-[18px]"
-                                    >{{ ARTIFACT_ICONS[category] }}</span
+                                    >{{ SOURCE_ICONS[category] }}</span
                                 >
                                 <span class="text-sm font-bold text-gray-700">{{
-                                    ARTIFACT_LABELS[category]
+                                    SOURCE_LABELS[category]
                                 }}</span>
                             </div>
                             <button
@@ -596,7 +583,7 @@ onUnmounted(() => {
                         <div class="p-3 space-y-2 flex-1">
                             <div
                                 v-for="(item, index) in artifacts.filter(
-                                    (a) => a.artifact_type === category
+                                    (a) => a.source_type === category
                                 )"
                                 :key="item.id"
                                 class="group flex items-center gap-4 bg-white p-2 rounded border border-gray-200 shadow-sm hover:border-indigo-500 transition-all"
@@ -680,7 +667,7 @@ onUnmounted(() => {
                             <div
                                 v-if="
                                     artifacts.filter(
-                                        (a) => a.artifact_type === category
+                                        (a) => a.source_type === category
                                     ).length === 0
                                 "
                                 class="text-center py-4"
@@ -784,7 +771,7 @@ onUnmounted(() => {
                                                         (s) =>
                                                             s.system_type ===
                                                             "figma"
-                                                    )?.status === "connected"
+                                                    )?.status === "completed"
                                                         ? "연동됨"
                                                         : "설정 필요"
                                                 }}
@@ -802,7 +789,7 @@ onUnmounted(() => {
                                         @click="openReauthPopup('figma')"
                                         class="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium underline"
                                     >
-                                        연동 설정
+                                        연동 갱신
                                     </button>
                                 </div>
                                 <p
@@ -812,7 +799,7 @@ onUnmounted(() => {
                                         )?.enabled &&
                                         externalSystems.find(
                                             (s) => s.system_type === 'figma'
-                                        )?.status !== 'connected'
+                                        )?.status !== 'completed'
                                     "
                                     class="text-[10px] text-orange-500 mt-1"
                                 >
@@ -822,6 +809,20 @@ onUnmounted(() => {
                         </div>
                     </div>
                 </div>
+            </div>
+            <!-- 하단 버튼 (이동됨) -->
+            <div
+                class="mt-8 flex items-center justify-end gap-3 border-t border-gray-100 pt-6"
+            >
+                <button @click="goBack" class="btn-secondary">취소</button>
+                <button
+                    type="button"
+                    @click="handleSubmit"
+                    class="btn-primary flex items-center gap-1"
+                >
+                    <span class="material-icons-outlined text-sm">save</span>
+                    수정 완료
+                </button>
             </div>
         </section>
 

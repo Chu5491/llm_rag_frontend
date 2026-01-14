@@ -6,10 +6,10 @@ import {formatDate, formatFileSize} from "../utils/format.js";
 import {fetchProjectDetail} from "../services/projectApi.js";
 import type {ProjectResponse} from "../types/project.js";
 import {
-    ARTIFACT_TYPES,
-    ARTIFACT_LABELS,
-    ARTIFACT_ICONS,
-    type ArtifactType,
+    SOURCE_TYPES,
+    SOURCE_LABELS,
+    SOURCE_ICONS,
+    type SourceType,
 } from "../types/project.js";
 
 const route = useRoute();
@@ -57,12 +57,12 @@ const getSystemIcon = (systemType: string) => {
 };
 
 // 카테고리 표시 순서
-const ORDERED_CATEGORIES: ArtifactType[] = [
-    ARTIFACT_TYPES.REQUIREMENTS,
-    ARTIFACT_TYPES.SCREEN_DESIGN,
-    ARTIFACT_TYPES.API_SPEC,
-    ARTIFACT_TYPES.MANUAL,
-    ARTIFACT_TYPES.ETC,
+const ORDERED_CATEGORIES: SourceType[] = [
+    SOURCE_TYPES.REQUIREMENTS,
+    SOURCE_TYPES.SCREEN_DESIGN,
+    SOURCE_TYPES.API_SPEC,
+    SOURCE_TYPES.MANUAL,
+    SOURCE_TYPES.ETC,
 ];
 
 // 뒤로 가기
@@ -294,7 +294,7 @@ onMounted(() => {
                         :key="category"
                         class="flex flex-col rounded-lg border border-gray-200 bg-white"
                         :class="{
-                            'lg:col-span-2': category === ARTIFACT_TYPES.ETC,
+                            'lg:col-span-2': category === SOURCE_TYPES.ETC,
                         }"
                     >
                         <!-- 헤더 -->
@@ -304,10 +304,10 @@ onMounted(() => {
                             <div class="flex items-center gap-2">
                                 <span
                                     class="material-icons-outlined text-gray-400 text-[18px]"
-                                    >{{ ARTIFACT_ICONS[category] }}</span
+                                    >{{ SOURCE_ICONS[category] }}</span
                                 >
                                 <span class="text-sm font-bold text-gray-700">{{
-                                    ARTIFACT_LABELS[category]
+                                    SOURCE_LABELS[category]
                                 }}</span>
                             </div>
                         </div>
@@ -317,14 +317,14 @@ onMounted(() => {
                             <div
                                 v-if="
                                     project.artifacts.filter(
-                                        (a) => a.artifact_type === category
+                                        (a) => a.source_type === category
                                     ).length > 0
                                 "
                                 class="space-y-2"
                             >
                                 <div
                                     v-for="artifact in project.artifacts.filter(
-                                        (a) => a.artifact_type === category
+                                        (a) => a.source_type === category
                                     )"
                                     :key="artifact.id"
                                     class="flex items-center gap-2 bg-white p-2 rounded border border-gray-200 shadow-sm"

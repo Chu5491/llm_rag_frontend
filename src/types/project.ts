@@ -8,7 +8,7 @@ export type ProjectItemStatus =
     | "error";
 
 // 산출물 타입 (DB 저장용)
-export const ARTIFACT_TYPES = {
+export const SOURCE_TYPES = {
     REQUIREMENTS: "requirements",
     SCREEN_DESIGN: "screen_design",
     API_SPEC: "api_spec",
@@ -16,30 +16,30 @@ export const ARTIFACT_TYPES = {
     ETC: "etc",
 } as const;
 
-export type ArtifactType = (typeof ARTIFACT_TYPES)[keyof typeof ARTIFACT_TYPES];
+export type SourceType = (typeof SOURCE_TYPES)[keyof typeof SOURCE_TYPES];
 
 // UI 매핑 (Label)
-export const ARTIFACT_LABELS: Record<ArtifactType, string> = {
-    [ARTIFACT_TYPES.REQUIREMENTS]: "요구사항명세서",
-    [ARTIFACT_TYPES.SCREEN_DESIGN]: "화면설계서",
-    [ARTIFACT_TYPES.API_SPEC]: "API 명세서",
-    [ARTIFACT_TYPES.MANUAL]: "메뉴얼",
-    [ARTIFACT_TYPES.ETC]: "기타 자료",
+export const SOURCE_LABELS: Record<SourceType, string> = {
+    [SOURCE_TYPES.REQUIREMENTS]: "요구사항명세서",
+    [SOURCE_TYPES.SCREEN_DESIGN]: "화면설계서",
+    [SOURCE_TYPES.API_SPEC]: "API 명세서",
+    [SOURCE_TYPES.MANUAL]: "메뉴얼",
+    [SOURCE_TYPES.ETC]: "기타 자료",
 };
 
 // UI 아이콘 매핑
-export const ARTIFACT_ICONS: Record<ArtifactType, string> = {
-    [ARTIFACT_TYPES.REQUIREMENTS]: "assignment",
-    [ARTIFACT_TYPES.SCREEN_DESIGN]: "web_asset",
-    [ARTIFACT_TYPES.API_SPEC]: "api",
-    [ARTIFACT_TYPES.MANUAL]: "menu_book",
-    [ARTIFACT_TYPES.ETC]: "folder_open",
+export const SOURCE_ICONS: Record<SourceType, string> = {
+    [SOURCE_TYPES.REQUIREMENTS]: "assignment",
+    [SOURCE_TYPES.SCREEN_DESIGN]: "web_asset",
+    [SOURCE_TYPES.API_SPEC]: "api",
+    [SOURCE_TYPES.MANUAL]: "menu_book",
+    [SOURCE_TYPES.ETC]: "folder_open",
 };
 
 export interface ProjectArtifact {
     id: number;
     project_id: number;
-    artifact_type: string;
+    source_type: string;
     name: string;
     file_name: string | null;
     extension: string | null;
@@ -77,7 +77,7 @@ export interface ProjectBase {
 // --- 2. Creation / UI (Writing) ---
 
 export interface ArtifactCreate {
-    artifact_type: string;
+    source_type: string;
     name: string;
     file_name: string | null;
     has_file: boolean;
@@ -95,7 +95,7 @@ export interface ExternalSystemCreate {
     pat?: string;
     label?: string; // UI Only
     description?: string; // UI Only
-    status?: "idle" | "connected" | "error"; // UI Only
+    status?: "idle" | "completed" | "error"; // UI Only
 }
 
 export interface FeatureCreate {

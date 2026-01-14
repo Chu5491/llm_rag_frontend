@@ -9,10 +9,10 @@ import {
     ExternalSystemItem,
     ProjectBase,
     ProjectCreate,
-    ArtifactType,
-    ARTIFACT_TYPES,
-    ARTIFACT_LABELS,
-    ARTIFACT_ICONS,
+    SourceType,
+    SOURCE_TYPES,
+    SOURCE_LABELS,
+    SOURCE_ICONS,
 } from "../types/project.js";
 import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
 
@@ -32,12 +32,12 @@ const projectBase = ref<ProjectBase>({
 });
 
 // 카테고리 표시 순서
-const ORDERED_CATEGORIES: ArtifactType[] = [
-    ARTIFACT_TYPES.REQUIREMENTS,
-    ARTIFACT_TYPES.SCREEN_DESIGN,
-    ARTIFACT_TYPES.API_SPEC,
-    ARTIFACT_TYPES.MANUAL,
-    ARTIFACT_TYPES.ETC,
+const ORDERED_CATEGORIES: SourceType[] = [
+    SOURCE_TYPES.REQUIREMENTS,
+    SOURCE_TYPES.SCREEN_DESIGN,
+    SOURCE_TYPES.API_SPEC,
+    SOURCE_TYPES.MANUAL,
+    SOURCE_TYPES.ETC,
 ];
 
 // 산출물 목록
@@ -52,9 +52,9 @@ const removeArtifactRow = (id?: number) => {
 
 // 파일 선택 처리
 const fileInput = ref<HTMLInputElement | null>(null);
-const targetCategory = ref<ArtifactType | null>(null);
+const targetCategory = ref<SourceType | null>(null);
 
-const triggerFileInput = (category: ArtifactType) => {
+const triggerFileInput = (category: SourceType) => {
     if (!fileInput.value) return;
     targetCategory.value = category;
     fileInput.value.value = ""; // 초기화
@@ -72,8 +72,9 @@ const handleFileChange = (event: Event) => {
     // 새 행 추가
     artifacts.value.push({
         id: nextArtifactId++,
-        artifact_type: targetCategory.value,
+        source_type: targetCategory.value,
         name: file.name,
+        file_name: file.name,
         has_file: true,
         file: file,
         file_size: file.size,
@@ -148,7 +149,7 @@ const saveExternalConfig = async () => {
             const data = await checkFigmaPersist(system.url, system.pat);
             console.log("Figma 연결 성공:", data);
 
-            system.status = "connected";
+            system.status = "completed";
             popupError.value = null;
             activeExternalPopup.value = null; // 팝업 닫기
         } catch (e: any) {
@@ -182,8 +183,9 @@ const handleSubmit = async () => {
             description: projectBase.value.description,
             service_type: projectBase.value.service_type,
             artifacts: artifacts.value.map((a) => ({
-                artifact_type: a.artifact_type,
+                source_type: a.source_type,
                 name: a.name,
+                file_name: a.file_name,
                 has_file: a.has_file,
                 file: a.file,
                 file_size: a.file_size,
@@ -331,8 +333,7 @@ const formatFileSize = (bytes: number) => {
                             :key="category"
                             class="flex flex-col rounded-lg border border-gray-200 bg-white"
                             :class="{
-                                'lg:col-span-2':
-                                    category === ARTIFACT_TYPES.ETC,
+                                'lg:col-span-2': category === SOURCE_TYPES.ETC,
                             }"
                         >
                             <div
@@ -341,11 +342,11 @@ const formatFileSize = (bytes: number) => {
                                 <div class="flex items-center gap-2">
                                     <span
                                         class="material-icons-outlined text-gray-400 text-[18px]"
-                                        >{{ ARTIFACT_ICONS[category] }}</span
+                                        >{{ SOURCE_ICONS[category] }}</span
                                     >
                                     <span
                                         class="text-sm font-bold text-gray-700"
-                                        >{{ ARTIFACT_LABELS[category] }}</span
+                                        >{{ SOURCE_LABELS[category] }}</span
                                     >
                                 </div>
                                 <button
@@ -365,7 +366,7 @@ const formatFileSize = (bytes: number) => {
                                 <!-- 파일 목록이 있는 경우 -->
                                 <div
                                     v-for="item in artifacts.filter(
-                                        (a) => a.artifact_type === category
+                                        (a) => a.source_type === category
                                     )"
                                     :key="item.id"
                                     class="group flex items-center gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-500 transition-all"
@@ -450,7 +451,7 @@ const formatFileSize = (bytes: number) => {
                                 <div
                                     v-if="
                                         artifacts.filter(
-                                            (a) => a.artifact_type === category
+                                            (a) => a.source_type === category
                                         ).length === 0
                                     "
                                     class="text-center py-4"
@@ -530,7 +531,7 @@ const formatFileSize = (bytes: number) => {
                                         v-if="
                                             externalSystems.find(
                                                 (s) => s.system_type === 'figma'
-                                            )?.status !== 'connected'
+                                            )?.status !== 'completed'
                                         "
                                         class="text-xs text-orange-500"
                                     >
