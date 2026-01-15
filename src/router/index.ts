@@ -71,6 +71,11 @@ const routes: Array<RouteRecordRaw> = [
         props: true,
     },
     {
+        path: "/testcase/duplicate",
+        name: "ClusteringView",
+        component: () => import("../views/ClusteringView.vue"),
+    },
+    {
         path: "/setting",
         name: "Setting",
         component: Setting,

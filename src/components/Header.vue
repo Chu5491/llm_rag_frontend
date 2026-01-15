@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import {computed} from "vue";
-import {useRoute} from "vue-router";
+import {useRoute, useRouter} from "vue-router";
+import {useAuthStore} from "../stores/auth.js";
 
 const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
+
+// 로그아웃 핸들러
+const handleLogout = () => {
+    authStore.logout();
+    router.push("/login");
+};
 
 // 현재 라우트 기반 타이틀 반환
 const pageTitle = computed(() => {
@@ -51,16 +60,37 @@ const pageTitle = computed(() => {
                 ></span>
             </button>
 
-            <!-- Profile Dropdown (Mock) -->
-            <div class="flex items-center gap-3 pl-4 border-l border-gray-200">
+            <!-- Profile Dropdown -->
+            <div
+                v-if="authStore.isAuthenticated && authStore.user"
+                class="flex items-center gap-3 pl-4 border-l border-gray-200"
+            >
                 <div class="text-right hidden sm:block">
-                    <p class="text-sm font-medium text-gray-700">홍길동</p>
-                    <p class="text-xs text-gray-500">Administrator</p>
+                    <p class="text-sm font-medium text-gray-700">
+                        {{ authStore.user.name || "사용자" }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        {{ authStore.user.role }}
+                    </p>
                 </div>
                 <button
                     class="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 hover:ring-2 hover:ring-indigo-500 transition-all"
                 >
-                    홍
+                    {{ (authStore.user.name || "U").charAt(0) }}
+                </button>
+                <button
+                    @click="handleLogout"
+                    class="ml-2 text-xs text-gray-500 hover:text-red-500"
+                >
+                    로그아웃
+                </button>
+            </div>
+            <div v-else class="pl-4 border-l border-gray-200">
+                <button
+                    @click="router.push('/login')"
+                    class="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                    로그인
                 </button>
             </div>
         </div>

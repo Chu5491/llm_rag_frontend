@@ -15,6 +15,7 @@
         "marked": "^17.0.1",
         "material-icons": "^1.13.14",
         "material-symbols": "^0.40.2",
+        "pinia": "^3.0.4",
         "vue": "^3.5.25",
         "vue-router": "^4.4.5",
         "vuedraggable": "^4.1.0"

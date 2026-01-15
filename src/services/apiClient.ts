@@ -10,7 +10,12 @@ export class ApiError extends Error {
     public statusText: string;
     public data: any;
 
-    constructor(message: string, status: number, statusText: string, data?: any) {
+    constructor(
+        message: string,
+        status: number,
+        statusText: string,
+        data?: any
+    ) {
         super(message);
         this.name = "ApiError";
         this.status = status;
@@ -30,7 +35,10 @@ const BASE_URL = "/api/v1";
 /**
  * URL에 쿼리 파라미터를 추가합니다.
  */
-function appendQueryParams(url: string, params?: Record<string, string | number | boolean>): string {
+function appendQueryParams(
+    url: string,
+    params?: Record<string, string | number | boolean>
+): string {
     if (!params) return url;
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -39,21 +47,27 @@ function appendQueryParams(url: string, params?: Record<string, string | number 
         }
     });
     const queryString = searchParams.toString();
-    return queryString ? `${url}${url.includes("?") ? "&" : "?"}${queryString}` : url;
+    return queryString
+        ? `${url}${url.includes("?") ? "&" : "?"}${queryString}`
+        : url;
 }
 
 /**
  * 공통 fetch 래퍼 함수
  */
-async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const { params, headers = {}, ...init } = options;
+async function request<T>(
+    endpoint: string,
+    options: RequestOptions = {}
+): Promise<T> {
+    const {params, headers = {}, ...init} = options;
 
     // URL 구성
     const url = appendQueryParams(`${BASE_URL}${endpoint}`, params);
 
     // 기본 헤더 설정 (FormData가 아닐 경우에만 Content-Type 설정)
+    const token = localStorage.getItem("accessToken");
     const defaultHeaders: Record<string, string> = {
-        // "Authorization": `Bearer ${token}`, // 필요 시 토큰 추가
+        ...(token ? {Authorization: `Bearer ${token}`} : {}),
     };
 
     if (!(init.body instanceof FormData)) {
@@ -82,8 +96,17 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
         if (!response.ok) {
             // 에러 메시지 추출 우선순위: data.detail -> data.message -> response.statusText
-            const errorMessage = data?.detail || data?.message || response.statusText || "알 수 없는 오류가 발생했습니다.";
-            throw new ApiError(errorMessage, response.status, response.statusText, data);
+            const errorMessage =
+                data?.detail ||
+                data?.message ||
+                response.statusText ||
+                "알 수 없는 오류가 발생했습니다.";
+            throw new ApiError(
+                errorMessage,
+                response.status,
+                response.statusText,
+                data
+            );
         }
 
         return data as T;
@@ -92,13 +115,17 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
             throw error;
         }
         // 네트워크 오류 등 fetch 자체가 실패한 경우
-        throw new Error(error instanceof Error ? error.message : "네트워크 요청에 실패했습니다.");
+        throw new Error(
+            error instanceof Error
+                ? error.message
+                : "네트워크 요청에 실패했습니다."
+        );
     }
 }
 
 export const apiClient = {
     get: <T>(endpoint: string, options?: RequestOptions) =>
-        request<T>(endpoint, { ...options, method: "GET" }),
+        request<T>(endpoint, {...options, method: "GET"}),
 
     post: <T>(endpoint: string, body?: any, options?: RequestOptions) => {
         const isFormData = body instanceof FormData;
@@ -110,7 +137,7 @@ export const apiClient = {
     },
 
     put: <T>(endpoint: string, body?: any, options?: RequestOptions) => {
-         const isFormData = body instanceof FormData;
+        const isFormData = body instanceof FormData;
         return request<T>(endpoint, {
             ...options,
             method: "PUT",
@@ -120,13 +147,13 @@ export const apiClient = {
 
     patch: <T>(endpoint: string, body?: any, options?: RequestOptions) => {
         const isFormData = body instanceof FormData;
-       return request<T>(endpoint, {
-           ...options,
-           method: "PATCH",
-           body: isFormData ? body : JSON.stringify(body),
-       });
-   },
+        return request<T>(endpoint, {
+            ...options,
+            method: "PATCH",
+            body: isFormData ? body : JSON.stringify(body),
+        });
+    },
 
     delete: <T>(endpoint: string, options?: RequestOptions) =>
-        request<T>(endpoint, { ...options, method: "DELETE" }),
+        request<T>(endpoint, {...options, method: "DELETE"}),
 };

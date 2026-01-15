@@ -335,10 +335,18 @@ onMounted(() => {
                                         <span
                                             class="material-icons-outlined text-sm"
                                             :class="
-                                                getFileIconColor(artifact.name)
+                                                getFileIconColor(
+                                                    artifact.file_name ??
+                                                        undefined
+                                                )
                                             "
                                         >
-                                            {{ getFileIcon(artifact.name) }}
+                                            {{
+                                                getFileIcon(
+                                                    artifact.file_name ??
+                                                        undefined
+                                                )
+                                            }}
                                         </span>
                                         <div class="flex flex-col min-w-0">
                                             <div

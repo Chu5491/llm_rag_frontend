@@ -15,7 +15,7 @@ const navItems = [
             {path: "/generate/new", name: "TC 자동 생성"},
             {path: "/generate", name: "TC 생성 이력"},
             {path: "/testcase", name: "TC 목록"},
-            {path: "/testcase/duplicate", name: "중복 TC 확인 (TBD)"},
+            {path: "/testcase/duplicate", name: "중복 TC 확인"},
         ],
     },
     {
@@ -54,6 +54,12 @@ const isActive = (path?: string) => {
             return false;
         }
         if (path === "/project" && route.path.startsWith("/project/new")) {
+            return false;
+        }
+        if (
+            path === "/testcase" &&
+            route.path.startsWith("/testcase/duplicate")
+        ) {
             return false;
         }
 

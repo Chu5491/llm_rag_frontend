@@ -6,3 +6,4 @@ export * from "./projectApi.js";
 export * from "./ollamaApi.js";
 export * from "./historyApi.js";
 export * from "./testcaseApi.js";
+export * from "./userApi.js";

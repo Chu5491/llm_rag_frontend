@@ -34,7 +34,6 @@ const handleRegister = async () => {
             password: password.value,
             name: name.value,
             role: UserRole.USER,
-            // company_id: optional, omitted
         });
 
         alert("회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.");
@@ -185,15 +184,6 @@ const handleRegister = async () => {
                     >로그인</a
                 >
             </p>
-        </div>
-        <div
-            class="mt-12 flex items-center gap-6 text-[11px] text-gray-400 font-medium uppercase tracking-widest"
-        >
-            <span>Enterprise Grade</span>
-            <span class="size-1 bg-gray-200 rounded-full"></span>
-            <span>SOC2 Compliant</span>
-            <span class="size-1 bg-gray-200 rounded-full"></span>
-            <span>Secure Infrastructure</span>
         </div>
     </div>
 </template>

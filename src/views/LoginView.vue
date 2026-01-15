@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {ref} from "vue";
 import {useRouter} from "vue-router";
+import {useAuthStore} from "../stores/auth.js";
 
 import {userApi} from "../services/userApi.js";
-import {ApiError} from "../services/apiClient.js";
 
 const router = useRouter();
+const authStore = useAuthStore();
 const email = ref("");
 const password = ref("");
 const rememberMe = ref(false);
@@ -24,6 +25,9 @@ const handleLogin = async () => {
 
         // 토큰 저장 (실제 구현 시 보안 고려 필요: cookie, memory etc)
         localStorage.setItem("accessToken", response.access_token);
+
+        // 유저 정보 가져오기
+        await authStore.fetchUser();
 
         // 페이지 이동
         router.push("/");
@@ -138,15 +142,6 @@ const handleLogin = async () => {
                     >회원가입</a
                 >
             </p>
-        </div>
-        <div
-            class="mt-12 flex items-center gap-6 text-[11px] text-gray-400 font-medium uppercase tracking-widest"
-        >
-            <span>Enterprise Grade</span>
-            <span class="size-1 bg-gray-200 rounded-full"></span>
-            <span>SOC2 Compliant</span>
-            <span class="size-1 bg-gray-200 rounded-full"></span>
-            <span>Secure Infrastructure</span>
         </div>
     </div>
 </template>

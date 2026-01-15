@@ -601,7 +601,17 @@ const handleRetry = async (id: number) => {
                 v-if="groupedHistories.length === 0"
                 class="text-center py-10 text-gray-500"
             >
-                데이터가 없습니다.
+                <slot name="empty">
+                    <div
+                        class="flex flex-col items-center justify-center gap-2"
+                    >
+                        <span
+                            class="material-icons-outlined text-4xl text-gray-300"
+                            >inbox</span
+                        >
+                        <p>데이터가 없습니다.</p>
+                    </div>
+                </slot>
             </div>
 
             <!-- 그룹 목록 -->

@@ -582,7 +582,7 @@ onUnmounted(() => {
                         <!-- 컨텐츠 -->
                         <div class="p-3 space-y-2 flex-1">
                             <div
-                                v-for="(item, index) in artifacts.filter(
+                                v-for="item in artifacts.filter(
                                     (a) => a.source_type === category
                                 )"
                                 :key="item.id"
@@ -593,9 +593,17 @@ onUnmounted(() => {
                                 >
                                     <span
                                         class="material-icons-outlined text-base"
-                                        :class="getFileIconColor(item.name)"
+                                        :class="
+                                            getFileIconColor(
+                                                item.file_name ?? undefined
+                                            )
+                                        "
                                     >
-                                        {{ getFileIcon(item.name) }}
+                                        {{
+                                            getFileIcon(
+                                                item.file_name ?? undefined
+                                            )
+                                        }}
                                     </span>
                                 </div>
 

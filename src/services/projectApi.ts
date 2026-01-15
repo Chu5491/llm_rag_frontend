@@ -28,7 +28,7 @@ export async function createProject(
             // 백엔드 매핑을 위해 name을 파일명으로 교체하여 반환
             return {
                 ...artifact,
-                name: artifact.file.name,
+                name: artifact.name,
                 file_name: artifact.file.name,
                 source_type: artifact.source_type,
                 file: undefined, // JSON 변환 시 제외
@@ -103,7 +103,7 @@ export async function updateProject(
                 return {
                     ...artifact,
                     id: undefined,
-                    name: artifact.file.name,
+                    name: artifact.name,
                     file_name: artifact.file.name,
                     source_type: artifact.source_type,
                     file: undefined,

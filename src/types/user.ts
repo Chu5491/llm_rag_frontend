@@ -1,13 +1,7 @@
 export enum UserRole {
-    ADMIN = "admin",
-    USER = "user",
-    GUEST = "guest",
-}
-
-export interface Company {
-    // Assuming minimal company structure based on usage, expand if needed
-    id: number;
-    name: string;
+    USER = "USER",
+    ADMIN = "ADMIN",
+    SUPER_ADMIN = "SUPER_ADMIN",
 }
 
 export interface UserBase {
@@ -19,7 +13,6 @@ export interface UserBase {
 export interface UserCreate extends UserBase {
     password: string;
     role?: UserRole;
-    company_id?: number | null;
 }
 
 export interface UserUpdate {
@@ -27,16 +20,13 @@ export interface UserUpdate {
     password?: string | null;
     role?: UserRole | null;
     is_active?: boolean | null;
-    company_id?: number | null;
 }
 
 export interface User extends UserBase {
     id: number;
     role: UserRole;
-    company_id?: number | null;
     created_at: string; // ISO datetime string
     updated_at?: string | null; // ISO datetime string
-    company?: Company | null;
 }
 
 export interface UserLogin {
