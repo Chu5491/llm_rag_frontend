@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient.js";
+import {apiClient} from "./apiClient.js";
 import type {
     ChatMessage,
     ChatResponse,
@@ -24,5 +24,5 @@ export async function getOllamaModels(): Promise<OllamaModelsResponse> {
 export async function sendChatMessage(
     messages: ChatMessage[]
 ): Promise<ChatResponse> {
-    return apiClient.post<ChatResponse>("/ollama/chat", { messages });
+    return apiClient.post<ChatResponse>("/mcp/chat", {messages});
 }

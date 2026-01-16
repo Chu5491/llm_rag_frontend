@@ -63,7 +63,7 @@ const sendMessage = async () => {
 
         // 응답 메시지 추가
         messages.value.push({
-            text: response.raw.message.content,
+            text: response.output,
             sender: "bot",
         });
     } catch (error) {

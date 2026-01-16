@@ -22,7 +22,9 @@ const props = withDefaults(
         currentPage?: number; // Server side current page, initial page in client mode
         sortKey?: string; // Server side sort key, initial sort key in client mode
         sortOrder?: "asc" | "desc"; // Server side sort order, initial sort order in client mode
+
         paginationMode?: "server" | "client"; // Pagination mode
+        rowClass?: (item: T) => string; // Custom row class function
     }>(),
     {
         itemsPerPage: 10,
@@ -267,7 +269,10 @@ const getAlignClass = (align?: string) => {
                             <!-- 메인 행 -->
                             <tr
                                 class="table-row transition-all duration-200"
-                                :class="{'cursor-pointer': $attrs.onRowClick}"
+                                :class="[
+                                    {'cursor-pointer': $attrs.onRowClick},
+                                    rowClass ? rowClass(item) : '',
+                                ]"
                                 @click="handleRowClick(item)"
                             >
                                 <!-- 확장 버튼 셀 -->
@@ -363,7 +368,7 @@ const getAlignClass = (align?: string) => {
                 <div class="flex items-center gap-2">
                     <span>Rows per page:</span>
                     <select
-                        :value="itemsPerPage"
+                        :value="props.itemsPerPage"
                         @change="handleItemsPerPageChange"
                         class="form-select border-gray-300 rounded-md text-xs py-1 pl-2 pr-7 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm cursor-pointer hover:border-gray-400 transition-colors"
                     >

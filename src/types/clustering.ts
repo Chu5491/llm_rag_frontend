@@ -1,28 +1,18 @@
+import {TestcaseResponse} from "./testcase.js";
+
 export interface ClusteringRequest {
     project_id: number;
-    history_id?: number;
+    history_id?: number | null;
     module?: string;
     eps?: number;
     min_samples?: number;
 }
 
 export interface ClusterGroup {
-    id: number; // or string if generated uuid
-    label: number; // cluster label (-1 for noise)
-    testcases: any[]; // Define TestCase type strictly if available, currently 'any' or shared TestCase type
-    representative_tc?: any; // To be determined by backend response structure
+    group_id: number;
+    average_distance: number;
+    items: any[]; // items contains TestcaseResponse & { distance_to_nearest: number }
 }
-
-// Based on the user's python return type:
-// {
-//     "summary": {
-//         "total_tcs": len(tcs),
-//         "groups_count": len(result["groups"]),
-//         "noise_count": len(result["noise"]),
-//     },
-//     "groups": result["groups"],
-//     "noise": result["noise"],
-// }
 
 export interface ClusteringSummary {
     total_tcs: number;
@@ -32,7 +22,18 @@ export interface ClusteringSummary {
 
 export interface ClusteringResponse {
     summary: ClusteringSummary;
-    groups: any;
+    groups: ClusterGroup[];
     noise: any[];
-    msg?: string;
+}
+
+export interface ClusterItem {
+    id: string;
+    testcase_id_tag: string;
+    title: string;
+    description: string;
+    count: number;
+    score: number;
+    insight: string;
+    testcases: TestcaseResponse[];
+    selected: boolean;
 }

@@ -28,6 +28,7 @@ const pageTitle = computed(() => {
         GenerateCreate: "테스트케이스 자동생성 실행",
         GenerateHistory: "자동생성 히스토리",
         test: "TC 생성 테스트",
+        ClusteringView: "중복 TC 확인",
     };
     return titleMap[name] || name;
 });

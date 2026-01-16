@@ -6,6 +6,7 @@ import {useAlert} from "../composables/useAlert.js";
 import {
     getTestCaseDetail,
     updateTestCase,
+    deleteTestCase,
     type TestcaseUpdate,
 } from "../services/testcaseApi.js";
 
@@ -204,6 +205,27 @@ const handleSubmit = async () => {
     } catch (error) {
         console.error("Failed to update test case:", error);
         showAlert("저장 중 오류가 발생했습니다.", "오류");
+    }
+};
+
+// 테스트케이스 삭제
+const handleDelete = async () => {
+    if (!formData.value.id) return;
+
+    const confirmed = await showConfirm(
+        "정말로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+        "삭제 확인"
+    );
+    if (!confirmed) return;
+
+    try {
+        await deleteTestCase(formData.value.id);
+        showAlert("삭제되었습니다.", "성공").then(() => {
+            router.back();
+        });
+    } catch (error) {
+        console.error("Failed to delete test case:", error);
+        showAlert("삭제 중 오류가 발생했습니다.", "오류");
     }
 };
 
@@ -545,20 +567,35 @@ onMounted(() => {
                     </div>
 
                     <!-- 버튼 영역 -->
-                    <div class="flex items-center justify-center gap-4 pt-6">
+                    <div class="flex items-center justify-between pt-6">
+                        <!-- 좌측: 삭제 버튼 -->
                         <button
                             type="button"
-                            @click="router.go(-1)"
-                            class="px-8 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors shadow-sm"
+                            @click="handleDelete"
+                            class="px-6 py-2.5 bg-red-100 hover:bg-red-200 text-red-600 font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2"
                         >
-                            목록으로
+                            <span class="material-icons-outlined text-[18px]"
+                                >delete</span
+                            >
+                            삭제
                         </button>
-                        <button
-                            type="submit"
-                            class="px-12 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
-                        >
-                            저장
-                        </button>
+
+                        <!-- 우측: 목록/저장 버튼 -->
+                        <div class="flex items-center gap-4">
+                            <button
+                                type="button"
+                                @click="router.go(-1)"
+                                class="px-8 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors shadow-sm"
+                            >
+                                목록으로
+                            </button>
+                            <button
+                                type="submit"
+                                class="px-12 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
+                            >
+                                저장
+                            </button>
+                        </div>
                     </div>
                 </form>
             </section>
