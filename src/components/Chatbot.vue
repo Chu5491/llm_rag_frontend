@@ -56,10 +56,18 @@ const sendMessage = async () => {
     scrollToBottom();
 
     try {
-        // API 메시지 전송 처리
-        const response = await sendChatMessage([
-            {role: "user", content: userMessage},
-        ]);
+        // 전체 대화 기록을 API 포맷으로 변환
+        // (UI 메시지 -> API ChatMessage)
+        const chatHistory = messages.value.map((msg) => ({
+            role:
+                msg.sender === "user"
+                    ? ("user" as const)
+                    : ("assistant" as const),
+            content: msg.text,
+        }));
+
+        // API 메시지 전송 처리 (히스토리 포함)
+        const response = await sendChatMessage(chatHistory);
 
         // 응답 메시지 추가
         messages.value.push({

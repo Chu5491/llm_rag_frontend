@@ -1,8 +1,9 @@
-import { apiClient } from "./apiClient.js";
+import {apiClient} from "./apiClient.js";
 import type {
     TestcaseResponse,
     TestcaseUpdate,
     TestcaseListParams,
+    TestcaseCreate,
 } from "../types/testcase.js";
 
 export * from "../types/testcase.js";
@@ -22,7 +23,9 @@ export async function getTestCaseList(
     if (params.priority) queryParams.priority = params.priority;
     if (params.module) queryParams.module = params.module;
 
-    return apiClient.get<TestcaseResponse[]>("/testcases", { params: queryParams });
+    return apiClient.get<TestcaseResponse[]>("/testcases", {
+        params: queryParams,
+    });
 }
 
 // 테스트케이스 상세 조회
@@ -30,6 +33,13 @@ export async function getTestCaseDetail(
     testcaseId: number
 ): Promise<TestcaseResponse> {
     return apiClient.get<TestcaseResponse>(`/testcases/${testcaseId}`);
+}
+
+// 테스트케이스 생성
+export async function createTestCase(
+    data: TestcaseCreate
+): Promise<TestcaseResponse> {
+    return apiClient.post<TestcaseResponse>("/testcases", data);
 }
 
 // 테스트케이스 수정
@@ -43,4 +53,13 @@ export async function updateTestCase(
 // 테스트케이스 삭제
 export async function deleteTestCase(testcaseId: number): Promise<void> {
     return apiClient.delete<void>(`/testcases/${testcaseId}`);
+}
+
+// AI 테스트케이스 병합
+export async function mergeTestCases(
+    testcaseIds: number[]
+): Promise<TestcaseCreate> {
+    return apiClient.post<TestcaseCreate>("/testcases/merge", {
+        testcase_ids: testcaseIds,
+    });
 }

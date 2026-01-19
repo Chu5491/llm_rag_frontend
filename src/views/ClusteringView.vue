@@ -270,9 +270,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <main
-        class="p-6 space-y-6 h-[calc(100vh-64px)] overflow-hidden flex flex-col bg-gray-50/50"
-    >
+    <main class="p-6 space-y-6 flex flex-col bg-gray-50/50">
         <!-- 페이지 헤더 -->
         <header>
             <p class="mt-1 text-sm text-gray-500">
@@ -367,7 +365,7 @@ onMounted(() => {
 
         <!-- 2. Content Area -->
         <section
-            class="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative"
+            class="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 relative min-h-[600px]"
         >
             <!-- Warning/Empty States -->
             <div
@@ -483,7 +481,7 @@ onMounted(() => {
             </div>
 
             <!-- Content Split View -->
-            <div class="flex-1 overflow-hidden flex relative">
+            <div class="flex-1 flex relative">
                 <!-- Loading Overlay for Clustering -->
                 <div
                     v-if="isClustering"
@@ -510,9 +508,7 @@ onMounted(() => {
 
                     <div v-else class="flex-1 flex w-full h-full">
                         <!-- Left: Cluster List -->
-                        <div
-                            class="flex-1 overflow-y-auto bg-gray-50 border-r border-gray-200"
-                        >
+                        <div class="flex-1 bg-gray-50 border-r border-gray-200">
                             <Table
                                 :columns="clusterColumns"
                                 :data="clusters"
@@ -604,7 +600,7 @@ onMounted(() => {
                         </p>
                     </div>
 
-                    <div v-else class="flex-1 overflow-y-auto bg-white p-6">
+                    <div v-else class="flex-1 bg-white p-6">
                         <Table
                             :columns="noiseColumns"
                             :data="noiseItems"
