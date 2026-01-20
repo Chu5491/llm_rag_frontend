@@ -18,6 +18,7 @@ export interface TestcaseCreate extends TestcaseBase {
     project_id: number;
     history_id?: number | null;
     testcase_id_tag?: string | null;
+    embedding?: [number] | null;
 }
 
 export interface TestcaseUpdate {

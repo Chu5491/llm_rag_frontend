@@ -39,7 +39,7 @@ export async function getTestCaseDetail(
 export async function createTestCase(
     data: TestcaseCreate
 ): Promise<TestcaseResponse> {
-    return apiClient.post<TestcaseResponse>("/testcases", data);
+    return apiClient.post<TestcaseResponse>("/testcases/create", data);
 }
 
 // 테스트케이스 수정

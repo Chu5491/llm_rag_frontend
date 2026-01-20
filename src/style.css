@@ -286,6 +286,18 @@
     .loading-spinner {
         @apply h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent;
     }
+    .loading-spinner-reverse {
+        @apply h-8 w-8 rounded-full border-2 border-indigo-500 border-t-transparent;
+        animation: spin-reverse 1s linear infinite;
+    }
+    @keyframes spin-reverse {
+        from {
+            transform: rotate(360deg);
+        }
+        to {
+            transform: rotate(0deg);
+        }
+    }
     .loading-text {
         @apply mt-4 text-sm text-gray-500;
     }

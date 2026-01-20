@@ -1,12 +1,35 @@
 <script setup lang="ts">
-import {ref, nextTick} from "vue";
-import {sendChatMessage} from "../services/api.js";
+import {ref, nextTick, onMounted, computed} from "vue";
+import {sendChatMessage, fetchProjects} from "../services/api.js";
 import {marked} from "marked";
+import type {ProjectResponse} from "../types/project.js";
 
 interface Message {
     text: string;
     sender: "user" | "bot";
 }
+
+// 퀵 액션 도구 정의
+const quickActions = [
+    {
+        id: "tc_lookup",
+        label: "TC 조회",
+        icon: "search",
+        color: "text-blue-600 bg-blue-50 border-blue-100 ring-blue-200",
+    },
+    {
+        id: "history_stats",
+        label: "생성 이력",
+        icon: "history",
+        color: "text-purple-600 bg-purple-50 border-purple-100 ring-purple-200",
+    },
+    {
+        id: "project_stats",
+        label: "프로젝트 현황",
+        icon: "analytics",
+        color: "text-emerald-600 bg-emerald-50 border-emerald-100 ring-emerald-200",
+    },
+];
 
 const isOpen = ref(false);
 const chatContainerRef = ref<HTMLElement | null>(null);
@@ -15,6 +38,73 @@ const isLoading = ref(false);
 const messages = ref<Message[]>([
     {text: "안녕하세요! 무엇을 도와드릴까요?", sender: "bot"},
 ]);
+
+// 툴 상태 관리
+const activeTool = ref<string | null>(null);
+const projects = ref<ProjectResponse[]>([]);
+const formData = ref({
+    projectId: null as number | null,
+    tcId: "",
+});
+
+// 프로젝트 목록 로드
+const loadProjects = async () => {
+    if (projects.value.length > 0) return;
+    try {
+        projects.value = await fetchProjects();
+    } catch (e) {
+        console.error("Failed to load projects", e);
+    }
+};
+
+// 도구 선택 핸들러
+const selectTool = async (toolId: string) => {
+    activeTool.value = toolId;
+    formData.value = {projectId: null, tcId: ""}; // 초기화
+    await loadProjects();
+
+    // 자동 스크롤 (폼이 잘 보이게)
+    scrollToBottom();
+};
+
+// 도구 실행 (프롬프트 생성 및 전송)
+const submitTool = async () => {
+    if (!activeTool.value) return;
+
+    let prompt = "";
+    const selectedProject = projects.value.find(
+        (p) => p.id === formData.value.projectId
+    );
+    const projectName = selectedProject ? selectedProject.name : "전체";
+
+    switch (activeTool.value) {
+        case "tc_lookup":
+            if (!formData.value.tcId || !selectedProject) return;
+            prompt = `프로젝트 '${projectName}'의 테스트케이스 ${formData.value.tcId}번 정보를 조회해줘.`;
+            break;
+        case "history_stats":
+            prompt = selectedProject
+                ? `프로젝트 '${projectName}'의 TC 생성 이력 통계를 보여줘.`
+                : `전체 프로젝트의 생성 이력 통계를 보여줘.`;
+            break;
+        case "project_stats":
+            if (!selectedProject) return;
+            prompt = `프로젝트 '${projectName}'의 현황 통계를 알려줘.`;
+            break;
+    }
+
+    // 폼 닫기
+    activeTool.value = null;
+
+    // 메시지 전송 로직 태우기 (사용자가 직접 친 것처럼)
+    newMessage.value = prompt;
+    await sendMessage();
+};
+
+// 도구 취소
+const cancelTool = () => {
+    activeTool.value = null;
+};
 
 // Markdown string -> HTML string 변환
 const renderMarkdown = (content: string): string => {
@@ -57,7 +147,6 @@ const sendMessage = async () => {
 
     try {
         // 전체 대화 기록을 API 포맷으로 변환
-        // (UI 메시지 -> API ChatMessage)
         const chatHistory = messages.value.map((msg) => ({
             role:
                 msg.sender === "user"
@@ -65,7 +154,6 @@ const sendMessage = async () => {
                     : ("assistant" as const),
             content: msg.text,
         }));
-
         // API 메시지 전송 처리 (히스토리 포함)
         const response = await sendChatMessage(chatHistory);
 
@@ -92,7 +180,7 @@ const sendMessage = async () => {
         <!-- 챗봇 창 -->
         <div
             v-if="isOpen"
-            class="w-100 h-116 bg-white rounded-lg shadow-xl flex flex-col overflow-hidden border border-gray-200"
+            class="w-[400px] h-[600px] bg-white rounded-lg shadow-xl flex flex-col overflow-hidden border border-gray-200"
         >
             <!-- 헤더 -->
             <div
@@ -151,24 +239,124 @@ const sendMessage = async () => {
                 </div>
             </div>
 
-            <!-- 입력창 -->
-            <div class="p-3 border-t border-gray-200 bg-white">
-                <div class="flex space-x-2">
-                    <input
-                        v-model="newMessage"
-                        @keyup.enter="sendMessage"
-                        type="text"
-                        placeholder="메시지를 입력하세요..."
-                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        :disabled="isLoading"
-                    />
-                    <button
-                        @click="sendMessage"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                        :disabled="isLoading || !newMessage.trim()"
+            <!-- Tool Input Form Overlay -->
+            <div
+                v-if="activeTool"
+                class="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] p-4 z-10 rounded-t-2xl animate-slide-up"
+            >
+                <div class="flex justify-between items-center mb-3">
+                    <span
+                        class="text-sm font-bold text-gray-800 flex items-center gap-2"
                     >
-                        전송
+                        <span
+                            class="material-icons-outlined text-base text-indigo-500"
+                        >
+                            {{
+                                quickActions.find((a) => a.id === activeTool)
+                                    ?.icon
+                            }}
+                        </span>
+                        {{
+                            quickActions.find((a) => a.id === activeTool)?.label
+                        }}
+                        입력
+                    </span>
+                    <button
+                        @click="cancelTool"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <span class="material-icons-outlined text-sm"
+                            >close</span
+                        >
                     </button>
+                </div>
+
+                <form @submit.prevent="submitTool" class="space-y-3">
+                    <!-- Project Select -->
+                    <div>
+                        <label
+                            class="block text-xs font-bold text-gray-500 mb-1"
+                            >프로젝트 선택</label
+                        >
+                        <select
+                            v-model="formData.projectId"
+                            required
+                            class="w-full text-sm p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                            <option :value="null" disabled>
+                                프로젝트를 선택하세요
+                            </option>
+                            <option
+                                v-for="p in projects"
+                                :key="p.id"
+                                :value="p.id"
+                            >
+                                {{ p.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- TC Link Input (Specific Tool Only) -->
+                    <div v-if="activeTool === 'tc_lookup'">
+                        <label
+                            class="block text-xs font-bold text-gray-500 mb-1"
+                            >테스트케이스 ID</label
+                        >
+                        <input
+                            type="text"
+                            v-model="formData.tcId"
+                            placeholder="예: 101, TC-2024..."
+                            required
+                            class="w-full text-sm p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="w-full py-2 bg-indigo-600 text-white rounded font-bold text-sm hover:bg-indigo-700 transition-colors"
+                    >
+                        전송하기
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white border-t border-gray-200">
+                <!-- 퀵 액션 바 -->
+                <div
+                    class="px-3 pt-2 pb-1 overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-2"
+                >
+                    <button
+                        v-for="action in quickActions"
+                        :key="action.id"
+                        @click="selectTool(action.id)"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold border transition-all"
+                        :class="action.color + ' hover:brightness-95'"
+                    >
+                        <span class="material-icons-outlined text-[14px]">{{
+                            action.icon
+                        }}</span>
+                        {{ action.label }}
+                    </button>
+                </div>
+
+                <div class="p-3 pt-1">
+                    <div class="flex space-x-2">
+                        <input
+                            v-model="newMessage"
+                            @keyup.enter="sendMessage"
+                            type="text"
+                            placeholder="메시지를 입력하세요..."
+                            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            :disabled="isLoading"
+                        />
+                        <button
+                            @click="sendMessage"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                            :disabled="isLoading || !newMessage.trim()"
+                        >
+                            전송
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -219,6 +407,31 @@ const sendMessage = async () => {
 .rotate-45 {
     transform: rotate(45deg);
     transition: transform 0.3s ease;
+}
+
+/* Animations */
+.animate-slide-up {
+    animation: slideUp 0.3s ease-out forwards;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Utilities */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
 }
 
 /* 마크다운 스타일링 */

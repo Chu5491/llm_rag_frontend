@@ -664,7 +664,10 @@ onMounted(() => {
             <MergeWorkspace
                 v-if="selectedCluster"
                 :cluster="selectedCluster"
+                :project-id="selectedProjectId || 0"
+                :history-id="selectedHistoryId || 0"
                 @close="clusters.forEach((c) => (c.selected = false))"
+                @refresh="fetchClustering"
             />
         </transition>
     </main>
