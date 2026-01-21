@@ -165,128 +165,9 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- Left Column -->
             <div class="space-y-6">
-                <!-- Creation Environment -->
-                <section
-                    class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-                >
-                    <h3 class="mb-6 text-lg font-semibold text-gray-900">
-                        생성 환경
-                    </h3>
-                    <div class="mb-6">
-                        <label
-                            class="mb-2 block text-sm font-medium text-gray-700"
-                        >
-                            자동생성 환경
-                        </label>
-                        <select
-                            class="block w-full rounded-md border-gray-300 py-2 pl-3 shadow-sm pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                        >
-                            <option>Local</option>
-                            <option>Tbell</option>
-                        </select>
-                    </div>
-                </section>
-
-                <!-- RAG/TC Config -->
-                <section
-                    class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-                >
-                    <h3 class="mb-6 text-lg font-semibold text-gray-900">
-                        RAG/테스트케이스 생성
-                    </h3>
-                    <div class="mb-6">
-                        <label
-                            class="mb-2 block text-sm font-medium text-gray-700"
-                        >
-                            기본 TC Prefix
-                        </label>
-                        <input
-                            v-model="tcPrefix"
-                            type="text"
-                            class="block w-full rounded-md border-gray-300 py-2 px-3 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        />
-                        <p class="mt-1 text-xs text-gray-500">
-                            생성될 TC 앞에 붙는 접두어
-                        </p>
-                    </div>
-                    <div
-                        class="mb-6 flex items-center justify-between border-t border-gray-100 pt-6"
-                    >
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700"
-                            >
-                                RAG 배치 크기
-                            </label>
-                            <p class="mt-1 text-xs text-gray-500">
-                                한 번에 처리할 문서 묶음 크기 (권장: 1-10)
-                            </p>
-                        </div>
-                        <div
-                            class="flex items-center rounded-md border border-gray-300"
-                        >
-                            <button
-                                @click="decreaseBatchSize"
-                                class="border-r border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
-                            >
-                                -
-                            </button>
-                            <input
-                                v-model="ragBatchSize"
-                                type="number"
-                                class="m-0 w-12 appearance-none border-none bg-transparent p-1 text-center text-sm focus:ring-0"
-                            />
-                            <button
-                                @click="increaseBatchSize"
-                                class="border-l border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
-                            >
-                                +
-                            </button>
-                        </div>
-                    </div>
-                    <div
-                        class="flex items-center justify-between border-t border-gray-100 pt-6"
-                    >
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700"
-                            >
-                                배치당 최대 TC 생성 갯수
-                            </label>
-                            <p class="mt-1 text-xs text-gray-500">
-                                한 번의 배치로 생성할 최대 테스트 케이스 수
-                            </p>
-                        </div>
-                        <div
-                            class="flex items-center rounded-md border border-gray-300"
-                        >
-                            <button
-                                @click="decreaseMaxTcCount"
-                                class="border-r border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
-                            >
-                                -
-                            </button>
-                            <input
-                                v-model="maxTcCount"
-                                type="number"
-                                class="m-0 w-12 appearance-none border-none bg-transparent p-1 text-center text-sm focus:ring-0"
-                            />
-                            <button
-                                @click="increaseMaxTcCount"
-                                class="border-l border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
-                            >
-                                +
-                            </button>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Right Column -->
-            <div class="space-y-6">
                 <!-- Models -->
                 <section
-                    class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+                    class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm h-full"
                 >
                     <h3 class="mb-6 text-lg font-semibold text-gray-900">
                         모델
@@ -360,37 +241,85 @@ onMounted(() => {
                         </select>
                     </div>
                 </section>
+            </div>
 
-                <!-- External Integration (Figma) -->
+            <!-- Right Column -->
+            <div class="space-y-6">
+                <!-- RAG/TC Config -->
                 <section
-                    class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+                    class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm h-full"
                 >
                     <h3 class="mb-6 text-lg font-semibold text-gray-900">
-                        외부 연동(Figma)
+                        RAG/테스트케이스 생성
                     </h3>
-                    <div class="mb-4 flex items-center justify-between">
-                        <span class="block text-sm font-medium text-gray-700">
-                            Figma 사용
-                        </span>
-
-                        <!-- Toggle -->
+                    <div
+                        class="mb-6 flex items-center justify-between border-t border-gray-100 pt-6"
+                    >
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700"
+                            >
+                                RAG 배치 크기
+                            </label>
+                            <p class="mt-1 text-xs text-gray-500">
+                                한 번에 처리할 문서 묶음 크기 (권장: 1-10)
+                            </p>
+                        </div>
                         <div
-                            class="custom-toggle"
-                            :class="
-                                isFigma
-                                    ? 'custom-toggle-active'
-                                    : 'custom-toggle-inactive'
-                            "
-                            @click="isFigma = !isFigma"
+                            class="flex items-center rounded-md border border-gray-300"
                         >
-                            <span
-                                class="custom-toggle-circle"
-                                :class="
-                                    isFigma
-                                        ? 'custom-toggle-circle-on'
-                                        : 'custom-toggle-circle-off'
-                                "
+                            <button
+                                @click="decreaseBatchSize"
+                                class="border-r border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
+                            >
+                                -
+                            </button>
+                            <input
+                                v-model="ragBatchSize"
+                                type="number"
+                                class="m-0 w-12 appearance-none border-none bg-transparent p-1 text-center text-sm focus:ring-0"
                             />
+                            <button
+                                @click="increaseBatchSize"
+                                class="border-l border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center justify-between border-t border-gray-100 pt-6"
+                    >
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700"
+                            >
+                                배치당 최대 TC 생성 갯수
+                            </label>
+                            <p class="mt-1 text-xs text-gray-500">
+                                한 번의 배치로 생성할 최대 테스트 케이스 수
+                            </p>
+                        </div>
+                        <div
+                            class="flex items-center rounded-md border border-gray-300"
+                        >
+                            <button
+                                @click="decreaseMaxTcCount"
+                                class="border-r border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
+                            >
+                                -
+                            </button>
+                            <input
+                                v-model="maxTcCount"
+                                type="number"
+                                class="m-0 w-12 appearance-none border-none bg-transparent p-1 text-center text-sm focus:ring-0"
+                            />
+                            <button
+                                @click="increaseMaxTcCount"
+                                class="border-l border-gray-300 px-3 py-1 text-gray-600 hover:bg-gray-100"
+                            >
+                                +
+                            </button>
                         </div>
                     </div>
                 </section>

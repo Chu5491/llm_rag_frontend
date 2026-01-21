@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import {ref, nextTick, onMounted, computed} from "vue";
-import {sendChatMessage, fetchProjects} from "../services/api.js";
+import {
+    sendChatMessage,
+    fetchProjects,
+    fetchHistories,
+} from "../services/api.js";
 import {marked} from "marked";
 import type {ProjectResponse} from "../types/project.js";
+import type {GenerationItem} from "../types/Generate.js";
 
 interface Message {
     text: string;
@@ -44,8 +49,11 @@ const activeTool = ref<string | null>(null);
 const projects = ref<ProjectResponse[]>([]);
 const formData = ref({
     projectId: null as number | null,
+    historyId: null as number | null,
+    historyTitle: "",
     tcId: "",
 });
+const histories = ref<GenerationItem[]>([]);
 
 // 프로젝트 목록 로드
 const loadProjects = async () => {
@@ -57,10 +65,41 @@ const loadProjects = async () => {
     }
 };
 
+// 프로젝트 선택 시 히스토리 로드
+const handleProjectChange = async () => {
+    formData.value.historyId = null;
+    formData.value.historyTitle = "";
+    histories.value = [];
+
+    if (formData.value.projectId) {
+        try {
+            histories.value = await fetchHistories(formData.value.projectId);
+        } catch (e) {
+            console.error("Failed to load histories", e);
+        }
+    }
+};
+
+// 히스토리 선택 핸들러
+const handleHistoryChange = () => {
+    const selectedHistory = histories.value.find(
+        (h) => h.id === formData.value.historyId
+    );
+    if (selectedHistory) {
+        formData.value.historyTitle = selectedHistory.title;
+    }
+};
+
 // 도구 선택 핸들러
 const selectTool = async (toolId: string) => {
     activeTool.value = toolId;
-    formData.value = {projectId: null, tcId: ""}; // 초기화
+    activeTool.value = toolId;
+    formData.value = {
+        projectId: null,
+        historyId: null,
+        historyTitle: "",
+        tcId: "",
+    }; // 초기화
     await loadProjects();
 
     // 자동 스크롤 (폼이 잘 보이게)
@@ -79,17 +118,22 @@ const submitTool = async () => {
 
     switch (activeTool.value) {
         case "tc_lookup":
-            if (!formData.value.tcId || !selectedProject) return;
-            prompt = `프로젝트 '${projectName}'의 테스트케이스 ${formData.value.tcId}번 정보를 조회해줘.`;
+            if (
+                !formData.value.tcId ||
+                !selectedProject ||
+                !formData.value.historyId
+            )
+                return;
+            prompt = `프로젝트 '${projectName}', 히스토리 '${formData.value.historyTitle}', 태그ID '${formData.value.tcId}'에 해당하는 테스트케이스 정보를 조회해줘.`;
             break;
         case "history_stats":
             prompt = selectedProject
-                ? `프로젝트 '${projectName}'의 TC 생성 이력 통계를 보여줘.`
-                : `전체 프로젝트의 생성 이력 통계를 보여줘.`;
+                ? `프로젝트 '${projectName}'의 "테스트케이스 생성 작업 이력(History)"에 대한 상태별(성공/실패/진행중) 통계를 조회해줘.`
+                : `전체 프로젝트의 "테스트케이스 생성 작업 이력(History)"에 대한 상태별(성공/실패/진행중) 통계를 조회해줘.`;
             break;
         case "project_stats":
             if (!selectedProject) return;
-            prompt = `프로젝트 '${projectName}'의 현황 통계를 알려줘.`;
+            prompt = `프로젝트 '${projectName}'에 등록된 "전체 테스트케이스(TC)"의 상태(활성/비활성) 및 총 개수 현황을 조회해줘.`;
             break;
     }
 
@@ -280,6 +324,7 @@ const sendMessage = async () => {
                         >
                         <select
                             v-model="formData.projectId"
+                            @change="handleProjectChange"
                             required
                             class="w-full text-sm p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
                         >
@@ -292,6 +337,33 @@ const sendMessage = async () => {
                                 :value="p.id"
                             >
                                 {{ p.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- History Select (TC Lookup Only) -->
+                    <div
+                        v-if="activeTool === 'tc_lookup' && formData.projectId"
+                    >
+                        <label
+                            class="block text-xs font-bold text-gray-500 mb-1"
+                            >히스토리 선택</label
+                        >
+                        <select
+                            v-model="formData.historyId"
+                            @change="handleHistoryChange"
+                            required
+                            class="w-full text-sm p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                            <option :value="null" disabled>
+                                히스토리를 선택하세요
+                            </option>
+                            <option
+                                v-for="h in histories"
+                                :key="h.id"
+                                :value="h.id"
+                            >
+                                {{ h.title }} ({{ h.id }})
                             </option>
                         </select>
                     </div>
