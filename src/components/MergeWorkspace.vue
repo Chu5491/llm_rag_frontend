@@ -43,6 +43,24 @@ const mergedResult = ref({
     priority: "",
 });
 
+// 프리필(내용 가져오기) 목록 UI 상태
+const isPrefillExpanded = ref(false);
+
+const prefillSources = computed(() => {
+    // 원본 순서 유지하며 선택된 항목만 필터링
+    if (!props.cluster || !props.cluster.testcases) return [];
+    return props.cluster.testcases.filter((tc) =>
+        selectedTcIds.value.has(tc.id)
+    );
+});
+
+const visiblePrefillSources = computed(() => {
+    const list = prefillSources.value;
+    // 펼쳐진 상태면 전체, 아니면 최대 4개만 노출
+    if (isPrefillExpanded.value) return list;
+    return list.slice(0, 4);
+});
+
 // Props 변경 감지
 watch(
     () => props.cluster,
@@ -514,36 +532,65 @@ const handleConfirmMerge = async () => {
                             >
                                 참조 및 내용 가져오기 (클릭 시 반영)
                             </label>
-                            <div
-                                class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
-                            >
-                                <button
-                                    v-for="tc in Array.from(
-                                        cluster.testcases
-                                    ).filter((t) => selectedTcIds.has(t.id))"
-                                    :key="tc.id"
-                                    @click="handlePrefill(tc)"
-                                    class="shrink-0 flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors text-left max-w-[250px] group"
-                                    title="클릭하여 내용 가져오기"
+                            <div class="space-y-2">
+                                <div
+                                    class="flex flex-wrap gap-2 transition-all duration-300 ease-in-out"
                                 >
-                                    <span
-                                        class="text-[10px] font-mono font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-indigo-100"
+                                    <button
+                                        v-for="tc in visiblePrefillSources"
+                                        :key="tc.id"
+                                        @click="handlePrefill(tc)"
+                                        class="shrink-0 flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 ring-2 ring-transparent focus:ring-indigo-200 transition-all text-left max-w-60 group animate-fade-in-up"
+                                        title="클릭하여 내용 가져오기"
                                     >
-                                        {{
-                                            tc.testcase_id_tag || `TC-${tc.id}`
-                                        }}
-                                    </span>
-                                    <span
-                                        class="text-xs text-gray-700 truncate font-medium group-hover:text-indigo-800"
+                                        <span
+                                            class="text-[10px] font-mono font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-indigo-100 shrink-0"
+                                        >
+                                            {{
+                                                tc.testcase_id_tag ||
+                                                `TC-${tc.id}`
+                                            }}
+                                        </span>
+                                        <span
+                                            class="text-xs text-gray-700 truncate font-medium group-hover:text-indigo-800"
+                                        >
+                                            {{ tc.title }}
+                                        </span>
+                                        <span
+                                            class="material-icons-outlined text-[14px] text-indigo-400 group-hover:text-indigo-600 ml-auto shrink-0"
+                                        >
+                                            content_copy
+                                        </span>
+                                    </button>
+
+                                    <!-- 더보기 / 접기 버튼 -->
+                                    <button
+                                        v-if="
+                                            prefillSources.length > 4 ||
+                                            isPrefillExpanded
+                                        "
+                                        @click="
+                                            isPrefillExpanded =
+                                                !isPrefillExpanded
+                                        "
+                                        class="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 text-gray-600 transition-colors text-xs font-bold"
                                     >
-                                        {{ tc.title }}
-                                    </span>
-                                    <span
-                                        class="material-icons-outlined text-[14px] text-indigo-400 group-hover:text-indigo-600 ml-auto"
-                                    >
-                                        content_copy
-                                    </span>
-                                </button>
+                                        <span
+                                            class="material-icons-outlined text-[16px]"
+                                        >
+                                            {{
+                                                isPrefillExpanded
+                                                    ? "expand_less"
+                                                    : "more_horiz"
+                                            }}
+                                        </span>
+                                        <span v-if="!isPrefillExpanded">
+                                            +{{ prefillSources.length - 4 }}
+                                            더보기
+                                        </span>
+                                        <span v-else>접기</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 

@@ -1,28 +1,30 @@
+```
 <script setup lang="ts">
-import {ref, onMounted, watch} from "vue";
+import {ref, onMounted, computed} from "vue";
 import {useRoute, useRouter} from "vue-router";
 import draggable from "vuedraggable";
 import {useAlert} from "../composables/useAlert.js";
+import {useAuthHelper} from "../composables/useAuthHelper.js";
+import {formatDateTime} from "../utils/date.js";
 import {
     getTestCaseDetail,
     updateTestCase,
     deleteTestCase,
+    createTestCaseComment,
     type TestcaseUpdate,
+    type TestCaseCommentResponse,
+    type TestCaseEditHistoryResponse,
+    type TestcaseStep,
 } from "../services/testcaseApi.js";
 
 // --- Types ---
-interface ScenarioStep {
-    action: string;
-    expected: string;
-}
-
 interface TestCaseForm {
     id: number;
     testcase_id_tag: string;
     module: string;
     title: string;
     priority: string;
-    scenario: ScenarioStep[];
+    scenario: TestcaseStep[];
     precondition: string;
     expectedResult: string;
     status: string;
@@ -31,6 +33,7 @@ interface TestCaseForm {
 const route = useRoute();
 const router = useRouter();
 const {showAlert, showConfirm} = useAlert();
+const {isMine} = useAuthHelper();
 
 // --- State ---
 const isLoading = ref(false);
@@ -48,85 +51,33 @@ const formData = ref<TestCaseForm>({
     status: "inactive",
 });
 
-// --- Mockup State ---
+// --- State: Real Data ---
 const activeTab = ref("history");
 const newComment = ref("");
-const newReply = ref("");
-const replyingTo = ref<number | null>(null);
 
-// Placeholder Data
-const versionHistory = ref([
-    {
-        version: "v1.2",
-        date: "2024-01-10 14:30",
-        author: "김철수",
-        comment: "시나리오 단계 구체화",
-    },
-    {
-        version: "v1.1",
-        date: "2024-01-09 11:20",
-        author: "이영희",
-        comment: "기대결과 수정",
-    },
-    {
-        version: "v1.0",
-        date: "2024-01-08 09:00",
-        author: "박지민",
-        comment: "최초 생성",
-    },
-]);
+const versionHistory = ref<TestCaseEditHistoryResponse[]>([]);
+const comments = ref<TestCaseCommentResponse[]>([]);
 
-const comments = ref([
-    {
-        id: 1,
-        author: "박지민",
-        date: "1시간 전",
-        content:
-            "선행조건에 로그인 여부도 포함되어야 할 것 같습니다. 확인 부탁드립니다.",
-        replies: [
-            {
-                id: 101,
-                author: "김철수",
-                date: "30분 전",
-                content: "네, 맞네요. 수정하겠습니다.",
-            },
-        ],
-    },
-]);
+// --- Actions : Comment ---
+const addComment = async () => {
+    if (!newComment.value.trim() || !formData.value.id) return;
 
-// --- Actions : Mockup ---
-const addComment = () => {
-    if (!newComment.value.trim()) return;
-    comments.value.unshift({
-        id: Date.now(),
-        author: "나 (Me)",
-        date: "방금 전",
-        content: newComment.value,
-        replies: [],
-    });
-    newComment.value = "";
-};
-
-const toggleReply = (commentId: number) => {
-    replyingTo.value = replyingTo.value === commentId ? null : commentId;
-    newReply.value = "";
-};
-
-const addReply = (commentId: number) => {
-    if (!newReply.value.trim()) return;
-    const comment = comments.value.find((c) => c.id === commentId);
-    if (comment) {
-        if (!comment.replies) comment.replies = [];
-        comment.replies.push({
-            id: Date.now(),
-            author: "나 (Me)",
-            date: "방금 전",
-            content: newReply.value,
-        });
+    try {
+        const response = await createTestCaseComment(
+            formData.value.id,
+            newComment.value
+        );
+        // 목록 최상단에 추가
+        comments.value.unshift(response);
+        newComment.value = "";
+    } catch (e) {
+        console.error("Failed to add comment:", e);
+        showAlert("댓글 등록에 실패했습니다.", "오류");
     }
-    replyingTo.value = null;
-    newReply.value = "";
 };
+
+// --- Actions : Comment ---
+// Legacy reply logic removed
 
 // --- Actions : Main ---
 
@@ -157,6 +108,10 @@ const fetchDetail = async () => {
             expectedResult: data.expected_result,
             status: data.status,
         };
+
+        // 추가 데이터 연동 (Array 보장)
+        comments.value = data.comments || [];
+        versionHistory.value = data.edit_history || [];
     } catch (err) {
         console.error("Failed to fetch test case:", err);
         error.value = "데이터를 불러오는 중 오류가 발생했습니다.";
@@ -701,38 +656,41 @@ onMounted(() => {
                                 <tbody class="divide-y divide-gray-100">
                                     <tr
                                         v-for="(
-                                            version, index
+                                            history, index
                                         ) in versionHistory"
-                                        :key="index"
+                                        :key="history.id"
                                         class="hover:bg-gray-50 transition-colors"
                                     >
                                         <td class="py-3 px-4">
                                             <input
                                                 type="checkbox"
-                                                class="rounded border-gray-300 text-primary focus:ring-primary"
+                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             />
                                         </td>
                                         <td class="py-3 px-4">
                                             <span
-                                                :class="
-                                                    index === 0
-                                                        ? 'text-blue-600 font-bold'
-                                                        : 'text-blue-600 cursor-pointer hover:underline'
-                                                "
+                                                class="text-blue-600 font-bold"
                                             >
-                                                {{ version.version }}
+                                                v{{
+                                                    versionHistory.length -
+                                                    index
+                                                }}.0
                                             </span>
                                         </td>
                                         <td class="py-3 px-4">
-                                            {{ version.date }}
+                                            {{
+                                                formatDateTime(
+                                                    history.updated_at
+                                                )
+                                            }}
                                         </td>
                                         <td
                                             class="py-3 px-4 font-medium text-gray-800"
                                         >
-                                            {{ version.author }}
+                                            User {{ history.user_id || "-" }}
                                         </td>
                                         <td class="py-3 px-4 text-gray-500">
-                                            {{ version.comment || "-" }}
+                                            -
                                         </td>
                                         <td class="py-3 px-4 text-right">
                                             <a
@@ -800,165 +758,63 @@ onMounted(() => {
                                             >face</span
                                         >
                                     </div>
-                                    <div class="flex-1 space-y-1">
+                                    <div class="flex-1 space-y-1.5">
                                         <div
                                             class="flex items-center justify-between"
                                         >
-                                            <h4
-                                                class="font-bold text-gray-900 text-sm"
-                                            >
-                                                {{ comment.author }}
-                                            </h4>
                                             <div
-                                                class="flex items-center gap-3"
+                                                class="flex items-center gap-2"
                                             >
                                                 <span
+                                                    class="font-bold text-gray-900 text-sm"
+                                                >
+                                                    User
+                                                    {{
+                                                        comment.user_id ||
+                                                        "Unknown"
+                                                    }}
+                                                </span>
+                                                <span
+                                                    v-if="
+                                                        isMine(comment.user_id)
+                                                    "
+                                                    class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-bold border border-indigo-100"
+                                                >
+                                                    나
+                                                </span>
+                                                <span
                                                     class="text-xs text-gray-500"
-                                                    >{{ comment.date }}</span
                                                 >
-                                                <!-- Action Buttons -->
-                                                <div
-                                                    class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    {{
+                                                        formatDateTime(
+                                                            comment.created_at
+                                                        )
+                                                    }}
+                                                </span>
+                                                <!-- 내 댓글일 때만 삭제 버튼 노출 -->
+                                                <button
+                                                    v-if="
+                                                        isMine(comment.user_id)
+                                                    "
+                                                    class="text-gray-300 hover:text-red-500 transition-colors ml-2"
+                                                    title="삭제"
                                                 >
-                                                    <button
-                                                        @click="
-                                                            toggleReply(
-                                                                comment.id
-                                                            )
-                                                        "
-                                                        class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                                        title="답글 작성"
+                                                    <span
+                                                        class="material-icons-outlined text-[16px]"
+                                                        >delete</span
                                                     >
-                                                        <span
-                                                            class="material-icons-outlined text-sm"
-                                                            >chat_bubble_outline</span
-                                                        >
-                                                    </button>
-                                                    <button
-                                                        class="text-gray-400 hover:text-red-500 flex items-center"
-                                                        title="삭제"
-                                                    >
-                                                        <span
-                                                            class="material-icons-outlined text-lg"
-                                                            >delete</span
-                                                        >
-                                                    </button>
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                         <p
-                                            class="text-gray-700 text-sm whitespace-pre-wrap"
+                                            class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap"
                                         >
                                             {{ comment.content }}
                                         </p>
                                     </div>
                                 </div>
-
-                                <!-- 대댓글 리스트 -->
-                                <div
-                                    v-if="
-                                        comment.replies &&
-                                        comment.replies.length > 0
-                                    "
-                                    class="pl-12 space-y-3"
-                                >
-                                    <div
-                                        v-for="reply in comment.replies"
-                                        :key="reply.id"
-                                        class="flex gap-4 p-3 rounded-lg bg-gray-50/50 border-l-2 border-blue-100 group"
-                                    >
-                                        <div
-                                            class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
-                                        >
-                                            <span
-                                                class="material-icons-outlined text-gray-400 text-sm"
-                                                >face</span
-                                            >
-                                        </div>
-                                        <div class="flex-1 space-y-1">
-                                            <div
-                                                class="flex items-center justify-between"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-2"
-                                                >
-                                                    <h4
-                                                        class="font-bold text-gray-900 text-sm"
-                                                    >
-                                                        {{ reply.author }}
-                                                    </h4>
-                                                    <span
-                                                        class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-medium border border-blue-100"
-                                                        >Writer</span
-                                                    >
-                                                </div>
-                                                <div
-                                                    class="flex items-center gap-3"
-                                                >
-                                                    <span
-                                                        class="text-xs text-gray-500"
-                                                        >{{ reply.date }}</span
-                                                    >
-                                                    <!-- Delete Button for Reply -->
-                                                    <button
-                                                        class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-                                                        title="삭제"
-                                                    >
-                                                        <span
-                                                            class="material-icons-outlined text-sm"
-                                                            >delete</span
-                                                        >
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <p
-                                                class="text-gray-600 text-sm whitespace-pre-wrap"
-                                            >
-                                                {{ reply.content }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Reply Input Form -->
-                                <div
-                                    v-if="replyingTo === comment.id"
-                                    class="pl-12 flex gap-3 animate-fade-in"
-                                >
-                                    <div
-                                        class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
-                                    >
-                                        <span
-                                            class="material-icons-outlined text-blue-600 text-sm"
-                                            >subdirectory_arrow_right</span
-                                        >
-                                    </div>
-                                    <div class="flex-1 space-y-2">
-                                        <textarea
-                                            v-model="newReply"
-                                            rows="2"
-                                            class="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-900 text-sm resize-none"
-                                            placeholder="답글을 작성해주세요..."
-                                            ref="replyInput"
-                                        ></textarea>
-                                        <div class="flex justify-end gap-2">
-                                            <button
-                                                @click="toggleReply(comment.id)"
-                                                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded transition-colors"
-                                            >
-                                                취소
-                                            </button>
-                                            <button
-                                                @click="addReply(comment.id)"
-                                                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors shadow-sm"
-                                                :disabled="!newReply.trim()"
-                                            >
-                                                답글 등록
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
+
                             <!-- Empty State -->
                             <div
                                 v-if="comments.length === 0"

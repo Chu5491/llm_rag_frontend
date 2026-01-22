@@ -38,6 +38,31 @@ export interface TestcaseResponse extends TestcaseBase {
     testcase_id_tag?: string | "";
     created_at: string; // ISO datetime string
     updated_at: string; // ISO datetime string
+    comments: TestCaseCommentResponse[];
+    edit_history: TestCaseEditHistoryResponse[];
+}
+
+export interface TestCaseCommentBase {
+    content: string;
+}
+
+export interface TestCaseCommentCreate extends TestCaseCommentBase {
+    testcase_id: number;
+    user_id?: number | null;
+}
+
+export interface TestCaseCommentResponse extends TestCaseCommentBase {
+    id: number;
+    testcase_id: number;
+    user_id?: number | null;
+    created_at: string;
+}
+
+export interface TestCaseEditHistoryResponse {
+    id: number;
+    testcase_id: number;
+    user_id?: number | null;
+    updated_at: string;
 }
 
 // 목록 조회 파라미터

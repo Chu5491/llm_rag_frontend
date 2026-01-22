@@ -4,6 +4,7 @@ import type {
     TestcaseUpdate,
     TestcaseListParams,
     TestcaseCreate,
+    TestCaseCommentResponse,
 } from "../types/testcase.js";
 
 export * from "../types/testcase.js";
@@ -62,4 +63,18 @@ export async function mergeTestCases(
     return apiClient.post<TestcaseCreate>("/testcases/merge", {
         testcase_ids: testcaseIds,
     });
+}
+
+// 댓글 작성
+export async function createTestCaseComment(
+    testcaseId: number,
+    content: string
+): Promise<TestCaseCommentResponse> {
+    return apiClient.post<TestCaseCommentResponse>(
+        `/testcases/${testcaseId}/comments`,
+        {
+            testcase_id: testcaseId,
+            content,
+        }
+    );
 }

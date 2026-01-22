@@ -133,7 +133,7 @@ const submitTool = async () => {
             break;
         case "project_stats":
             if (!selectedProject) return;
-            prompt = `프로젝트 '${projectName}'에 등록된 "전체 테스트케이스(TC)"의 상태(활성/비활성) 및 총 개수 현황을 조회해줘.`;
+            prompt = `프로젝트 '${projectName}'에 등록된 "전체 테스트케이스(TC)"의 상태별 개수 현황을 조회해줘.`;
             break;
     }
 
