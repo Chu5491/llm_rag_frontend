@@ -33,6 +33,7 @@ const selectedTcIds = ref<Set<number>>(new Set());
 // review: AI 결과 확인 및 수정
 type MergeStep = "idle" | "ready" | "generating" | "review";
 const mergeStep = ref<MergeStep>("idle");
+const isProcessing = ref(false); // 최종 처리 로딩 상태
 
 // 병합 결과 데이터
 const mergedResult = ref({
@@ -189,6 +190,7 @@ const handleConfirmMerge = async () => {
     if (!confirmed) return;
 
     try {
+        isProcessing.value = true;
         const firstOrigin = props.cluster.testcases.find((t) =>
             selectedTcIds.value.has(t.id)
         );
@@ -224,6 +226,9 @@ const handleConfirmMerge = async () => {
         );
         await Promise.all(deletePromises);
 
+        // 임베딩 생성 시간을 위해 3초 대기
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
         await showAlert("성공적으로 병합되었습니다.", "성공");
         emit("refresh");
         emit("close");
@@ -241,12 +246,23 @@ const handleConfirmMerge = async () => {
         }
 
         await showAlert(`저장 실패:\n${errorMsg}`, "오류 (상세)");
+    } finally {
+        isProcessing.value = false;
     }
 };
 </script>
 
 <template>
     <div class="absolute inset-0 z-30 bg-gray-50 flex flex-col overflow-hidden">
+        <!-- Processing Overlay -->
+        <div
+            v-if="isProcessing"
+            class="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in"
+        >
+            <LoadingSpinner message="병합 및 임베딩 생성 중입니다..." />
+            <p class="text-sm text-gray-500 mt-2">잠시만 기다려주세요....</p>
+        </div>
+
         <!-- Header -->
         <header
             class="bg-white border-b border-gray-200 px-6 h-16 flex items-center justify-between shrink-0 shadow-sm"

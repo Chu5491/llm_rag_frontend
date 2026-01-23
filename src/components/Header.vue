@@ -37,7 +37,7 @@ const pageTitle = computed(() => {
 </script>
 <template>
     <header
-        class="sticky top-0 z-20 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-6 h-16 flex items-center justify-between"
+        class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-6 h-16 flex items-center justify-between"
     >
         <!-- Left: Page Title / Breadcrumbs -->
         <div class="flex items-center">

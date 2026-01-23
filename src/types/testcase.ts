@@ -29,6 +29,7 @@ export interface TestcaseUpdate {
     expected_result?: string;
     priority?: string | null;
     status?: string;
+    user_id?: number | null;
 }
 
 export interface TestcaseResponse extends TestcaseBase {
@@ -48,13 +49,22 @@ export interface TestCaseCommentBase {
 
 export interface TestCaseCommentCreate extends TestCaseCommentBase {
     testcase_id: number;
+    parent_id?: number | null;
     user_id?: number | null;
+}
+
+export interface TestCaseUserResponse {
+    id: number;
+    email: string;
+    name?: string | null;
 }
 
 export interface TestCaseCommentResponse extends TestCaseCommentBase {
     id: number;
     testcase_id: number;
+    parent_id?: number | null;
     user_id?: number | null;
+    user?: TestCaseUserResponse | null;
     created_at: string;
 }
 
@@ -62,6 +72,7 @@ export interface TestCaseEditHistoryResponse {
     id: number;
     testcase_id: number;
     user_id?: number | null;
+    user?: TestCaseUserResponse | null;
     updated_at: string;
 }
 

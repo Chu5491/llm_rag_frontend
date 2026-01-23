@@ -11,6 +11,7 @@ import {
     updateTestCase,
     deleteTestCase,
     createTestCaseComment,
+    deleteTestCaseComment,
     type TestcaseUpdate,
     type TestCaseCommentResponse,
     type TestCaseEditHistoryResponse,
@@ -33,7 +34,7 @@ interface TestCaseForm {
 const route = useRoute();
 const router = useRouter();
 const {showAlert, showConfirm} = useAlert();
-const {isMine} = useAuthHelper();
+const {isMine, currentUserId, user, isAuthenticated} = useAuthHelper();
 
 // --- State ---
 const isLoading = ref(false);
@@ -57,14 +58,60 @@ const newComment = ref("");
 
 const versionHistory = ref<TestCaseEditHistoryResponse[]>([]);
 const comments = ref<TestCaseCommentResponse[]>([]);
+const newReply = ref("");
+const replyingTo = ref<number | null>(null);
+
+// 댓글 트리 구조 생성 (부모-자식 관계)
+const commentTree = computed(() => {
+    const map = new Map<number, TestCaseCommentResponse & {replies: any[]}>();
+    const roots: (TestCaseCommentResponse & {replies: any[]})[] = [];
+
+    // 1. 모든 댓글을 Map에 등록 (replies 배열 초기화)
+    comments.value.forEach((c) => {
+        map.set(c.id, {...c, replies: []});
+    });
+
+    // 2. 부모-자식 연결
+    comments.value.forEach((c) => {
+        const node = map.get(c.id);
+        if (c.parent_id) {
+            const parent = map.get(c.parent_id);
+            if (parent) {
+                parent.replies.push(node);
+            } else {
+                // 부모가 없으면(삭제됨 등) 루트로 처리하거나 제외 (여기선 루트로)
+                roots.push(node!);
+            }
+        } else {
+            roots.push(node!);
+        }
+    });
+
+    // 3. 최신순 정렬 (루트 및 대댓글)
+    roots.sort(
+        (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    map.forEach((node) => {
+        node.replies.sort(
+            (a, b) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime()
+        );
+    });
+
+    return roots;
+});
 
 // --- Actions : Comment ---
 const addComment = async () => {
-    if (!newComment.value.trim() || !formData.value.id) return;
+    if (!newComment.value.trim() || !formData.value.id || !currentUserId.value)
+        return;
 
     try {
         const response = await createTestCaseComment(
             formData.value.id,
+            currentUserId.value,
             newComment.value
         );
         // 목록 최상단에 추가
@@ -76,8 +123,49 @@ const addComment = async () => {
     }
 };
 
-// --- Actions : Comment ---
-// Legacy reply logic removed
+const handleDeleteComment = async (commentId: number) => {
+    const confirmed = await showConfirm("댓글을 삭제하시겠습니까?", "삭제");
+    if (!confirmed) return;
+
+    try {
+        await deleteTestCaseComment(commentId);
+        comments.value = comments.value.filter((c) => c.id !== commentId);
+    } catch (e) {
+        console.error("Failed to delete comment:", e);
+        showAlert("댓글 삭제에 실패했습니다.", "오류");
+    }
+};
+
+const toggleReply = (commentId: number) => {
+    if (replyingTo.value === commentId) {
+        replyingTo.value = null;
+        newReply.value = "";
+    } else {
+        replyingTo.value = commentId;
+        newReply.value = "";
+    }
+};
+
+const addReply = async (parentId: number) => {
+    if (!newReply.value.trim() || !formData.value.id || !currentUserId.value)
+        return;
+
+    try {
+        const response = await createTestCaseComment(
+            formData.value.id,
+            currentUserId.value,
+            newReply.value,
+            parentId
+        );
+        // 목록에 추가 (트리가 자동으로 재구성됨)
+        comments.value.push(response);
+        newReply.value = "";
+        replyingTo.value = null;
+    } catch (e) {
+        console.error("Failed to add reply:", e);
+        showAlert("답글 등록에 실패했습니다.", "오류");
+    }
+};
 
 // --- Actions : Main ---
 
@@ -134,6 +222,10 @@ const removeScenarioStep = (index: number) => {
 
 // 폼 제출 (수정)
 const handleSubmit = async () => {
+    if (!isAuthenticated.value) {
+        await showAlert("로그인 후 이용 가능합니다.", "알림");
+        return;
+    }
     if (!formData.value.id) return;
 
     const confirmed = await showConfirm("변경사항을 저장하시겠습니까?", "확인");
@@ -151,6 +243,7 @@ const handleSubmit = async () => {
                 expected: s.expected,
             })),
             status: formData.value.status,
+            user_id: currentUserId.value || null,
         };
 
         const response = await updateTestCase(formData.value.id, updateData);
@@ -165,6 +258,10 @@ const handleSubmit = async () => {
 
 // 테스트케이스 삭제
 const handleDelete = async () => {
+    if (!isAuthenticated.value) {
+        await showAlert("로그인 후 이용 가능합니다.", "알림");
+        return;
+    }
     if (!formData.value.id) return;
 
     const confirmed = await showConfirm(
@@ -599,19 +696,6 @@ onMounted(() => {
                 <div class="p-6">
                     <!-- 변경 이력 탭 -->
                     <div v-if="activeTab === 'history'" class="space-y-4">
-                        <div class="flex items-center gap-4 mb-4">
-                            <button
-                                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition-colors"
-                            >
-                                선택한 버전 비교
-                            </button>
-                            <div
-                                class="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600"
-                            >
-                                저장 시점들의 이력을 확인하고 버전을 비교하거나
-                                복원할 수 있습니다.
-                            </div>
-                        </div>
                         <div class="overflow-x-auto">
                             <table
                                 class="w-full text-left text-sm text-gray-600"
@@ -620,12 +704,6 @@ onMounted(() => {
                                     class="border-b border-gray-200 bg-gray-50"
                                 >
                                     <tr>
-                                        <th class="py-3 px-4 w-10">
-                                            <input
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                        </th>
                                         <th
                                             class="py-3 px-4 font-medium text-gray-500"
                                         >
@@ -634,22 +712,12 @@ onMounted(() => {
                                         <th
                                             class="py-3 px-4 font-medium text-gray-500"
                                         >
-                                            발행일
+                                            수정일
                                         </th>
                                         <th
                                             class="py-3 px-4 font-medium text-gray-500"
                                         >
-                                            변경한 사람
-                                        </th>
-                                        <th
-                                            class="py-3 px-4 font-medium text-gray-500"
-                                        >
-                                            비고
-                                        </th>
-                                        <th
-                                            class="py-3 px-4 font-medium text-gray-500 text-right"
-                                        >
-                                            동작
+                                            수정자
                                         </th>
                                     </tr>
                                 </thead>
@@ -661,12 +729,6 @@ onMounted(() => {
                                         :key="history.id"
                                         class="hover:bg-gray-50 transition-colors"
                                     >
-                                        <td class="py-3 px-4">
-                                            <input
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                        </td>
                                         <td class="py-3 px-4">
                                             <span
                                                 class="text-blue-600 font-bold"
@@ -687,19 +749,12 @@ onMounted(() => {
                                         <td
                                             class="py-3 px-4 font-medium text-gray-800"
                                         >
-                                            User {{ history.user_id || "-" }}
-                                        </td>
-                                        <td class="py-3 px-4 text-gray-500">
-                                            -
-                                        </td>
-                                        <td class="py-3 px-4 text-right">
-                                            <a
-                                                v-if="index > 0"
-                                                href="#"
-                                                class="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                                            >
-                                                복원
-                                            </a>
+                                            {{
+                                                history.user?.name ||
+                                                (history.user_id
+                                                    ? `User ${history.user_id}`
+                                                    : "-")
+                                            }}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -710,13 +765,24 @@ onMounted(() => {
                     <!-- 코멘트 탭 -->
                     <div v-if="activeTab === 'comments'" class="space-y-6">
                         <!-- 코멘트 입력 -->
-                        <div class="flex gap-4">
+
+                        <!-- 코멘트 입력 -->
+                        <!-- 로그인 상태 -->
+                        <div v-if="isAuthenticated" class="flex gap-4">
                             <div
-                                class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
+                                class="flex flex-col items-center gap-1 shrink-0"
                             >
+                                <div
+                                    class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200"
+                                >
+                                    <span
+                                        class="material-icons-outlined text-blue-600"
+                                        >person</span
+                                    >
+                                </div>
                                 <span
-                                    class="material-icons-outlined text-blue-600"
-                                    >person</span
+                                    class="text-[11px] font-bold text-gray-700"
+                                    >{{ user?.name }}</span
                                 >
                             </div>
                             <div class="flex-1 space-y-2">
@@ -730,7 +796,7 @@ onMounted(() => {
                                     <button
                                         type="button"
                                         @click="addComment"
-                                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                                         :disabled="!newComment.trim()"
                                     >
                                         등록
@@ -739,16 +805,27 @@ onMounted(() => {
                             </div>
                         </div>
 
+                        <!-- 비로그인 상태 -->
+                        <div
+                            v-else
+                            class="flex gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 items-center justify-center text-sm text-gray-500"
+                        >
+                            <span class="material-icons-outlined text-gray-400"
+                                >lock</span
+                            >
+                            <span>댓글을 작성하려면 로그인이 필요합니다.</span>
+                        </div>
+
                         <!-- 코멘트 리스트 -->
                         <div class="space-y-6">
                             <div
-                                v-for="comment in comments"
+                                v-for="comment in commentTree"
                                 :key="comment.id"
                                 class="space-y-4"
                             >
                                 <!-- 메인 코멘트 -->
                                 <div
-                                    class="group flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                                    class="group relative flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                                 >
                                     <div
                                         class="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
@@ -768,10 +845,11 @@ onMounted(() => {
                                                 <span
                                                     class="font-bold text-gray-900 text-sm"
                                                 >
-                                                    User
                                                     {{
-                                                        comment.user_id ||
-                                                        "Unknown"
+                                                        comment.user?.name ||
+                                                        (comment.user_id
+                                                            ? `User ${comment.user_id}`
+                                                            : "Unknown")
                                                     }}
                                                 </span>
                                                 <span
@@ -811,6 +889,149 @@ onMounted(() => {
                                         >
                                             {{ comment.content }}
                                         </p>
+                                    </div>
+                                    <!-- 답글 버튼 (로그인 시 노출) -->
+                                    <button
+                                        v-if="isAuthenticated"
+                                        @click="toggleReply(comment.id)"
+                                        class="absolute top-4 right-4 text-xs font-medium text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                                    >
+                                        <span
+                                            class="material-icons-outlined text-[14px]"
+                                            >reply</span
+                                        >
+                                        답글
+                                    </button>
+                                </div>
+
+                                <!-- 대댓글 리스트 -->
+                                <div
+                                    v-if="
+                                        comment.replies &&
+                                        comment.replies.length > 0
+                                    "
+                                    class="pl-12 space-y-3"
+                                >
+                                    <div
+                                        v-for="reply in comment.replies"
+                                        :key="reply.id"
+                                        class="flex gap-4 p-3 rounded-lg bg-gray-50/50 border-l-2 border-blue-100 group"
+                                    >
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
+                                        >
+                                            <span
+                                                class="material-icons-outlined text-gray-400 text-sm"
+                                                >face</span
+                                            >
+                                        </div>
+                                        <div class="flex-1 space-y-1">
+                                            <div
+                                                class="flex items-center justify-between"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <span
+                                                        class="font-bold text-gray-900 text-sm"
+                                                    >
+                                                        {{
+                                                            reply.user?.name ||
+                                                            (reply.user_id
+                                                                ? `User ${reply.user_id}`
+                                                                : "Unknown")
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        v-if="
+                                                            isMine(
+                                                                reply.user_id
+                                                            )
+                                                        "
+                                                        class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-bold border border-indigo-100"
+                                                        >나</span
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="flex items-center gap-3"
+                                                >
+                                                    <span
+                                                        class="text-xs text-gray-500"
+                                                        >{{
+                                                            formatDateTime(
+                                                                reply.created_at
+                                                            )
+                                                        }}</span
+                                                    >
+                                                    <!-- Delete Button for Reply -->
+                                                    <button
+                                                        v-if="
+                                                            isMine(
+                                                                reply.user_id
+                                                            )
+                                                        "
+                                                        @click="
+                                                            handleDeleteComment(
+                                                                reply.id
+                                                            )
+                                                        "
+                                                        class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                                                        title="삭제"
+                                                    >
+                                                        <span
+                                                            class="material-icons-outlined text-sm"
+                                                            >delete</span
+                                                        >
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p
+                                                class="text-gray-600 text-sm whitespace-pre-wrap"
+                                            >
+                                                {{ reply.content }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reply Input Form -->
+                                <div
+                                    v-if="replyingTo === comment.id"
+                                    class="pl-12 flex gap-3 animate-fade-in"
+                                >
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0"
+                                    >
+                                        <span
+                                            class="material-icons-outlined text-blue-600 text-sm"
+                                            >subdirectory_arrow_right</span
+                                        >
+                                    </div>
+                                    <div class="flex-1 space-y-2">
+                                        <textarea
+                                            v-model="newReply"
+                                            rows="2"
+                                            class="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-900 text-sm resize-none"
+                                            :placeholder="`${
+                                                comment.user?.name || '작성자'
+                                            }님에게 답글 작성...`"
+                                            ref="replyInput"
+                                        ></textarea>
+                                        <div class="flex justify-end gap-2">
+                                            <button
+                                                @click="toggleReply(comment.id)"
+                                                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded transition-colors"
+                                            >
+                                                취소
+                                            </button>
+                                            <button
+                                                @click="addReply(comment.id)"
+                                                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors shadow-sm"
+                                                :disabled="!newReply.trim()"
+                                            >
+                                                답글 등록
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

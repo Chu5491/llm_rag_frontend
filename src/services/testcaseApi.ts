@@ -68,13 +68,19 @@ export async function mergeTestCases(
 // 댓글 작성
 export async function createTestCaseComment(
     testcaseId: number,
-    content: string
+    userId: number,
+    content: string,
+    parentId?: number
 ): Promise<TestCaseCommentResponse> {
-    return apiClient.post<TestCaseCommentResponse>(
-        `/testcases/${testcaseId}/comments`,
-        {
-            testcase_id: testcaseId,
-            content,
-        }
-    );
+    return apiClient.post<TestCaseCommentResponse>("/testcases/comments", {
+        testcase_id: testcaseId,
+        user_id: userId,
+        parent_id: parentId,
+        content,
+    });
+}
+
+// 댓글 삭제
+export async function deleteTestCaseComment(commentId: number): Promise<void> {
+    return apiClient.delete<void>(`/testcases/comments/${commentId}`);
 }
