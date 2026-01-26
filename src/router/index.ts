@@ -77,7 +77,7 @@ const routes: Array<RouteRecordRaw> = [
     },
     {
         path: "/setting",
-        name: "Setting",
+        name: "환경설정",
         component: Setting,
     },
 ];

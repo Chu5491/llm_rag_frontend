@@ -177,8 +177,6 @@ const handlePrefill = async (tc: any) => {
             })) || [],
         priority: tc.priority || "",
     };
-
-    await showAlert("내용이 반영되었습니다.", "완료");
 };
 
 // Step 3. 최종 저장
