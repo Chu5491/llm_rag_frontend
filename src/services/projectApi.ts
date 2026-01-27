@@ -18,6 +18,9 @@ export async function createProject(
     if (data.description) {
         formData.append("description", data.description);
     }
+    if (data.user_id) {
+        formData.append("user_id", data.user_id.toString());
+    }
 
     // 2. Artifacts 처리 (파일 -> FormData, 메타데이터 -> JSON)
     const processedArtifacts = data.artifacts.map((artifact) => {

@@ -4,11 +4,13 @@ import type {DashboardStats} from "../../types/dashboard.js";
 export const useProjectCharts = () => {
     const projectCompositionOptions = ref({});
     const projectArtifactOptions = ref({});
+    const projectFeatureOptions = ref({});
 
-    const updateProjectCharts = (stats: DashboardStats) => {
+    const updateProjectCharts = (stats: any) => {
         // 초기화
         projectCompositionOptions.value = {};
         projectArtifactOptions.value = {};
+        projectFeatureOptions.value = {};
 
         if (!stats.projects_stats || stats.projects_stats.length === 0) return;
 
@@ -32,12 +34,12 @@ export const useProjectCharts = () => {
             }
         });
 
-        // 색상 팔레트 (Tailwind Colors)
+        // 색상 팔레트 (Refined for Cohesion)
         const typeColors: Record<string, string> = {
-            "PC Web": "#6366F1", // Indigo 500
-            "Mobile Web": "#3B82F6", // Blue 500
-            "Mobile App": "#EC4899", // Pink 500
-            Tablet: "#8B5CF6", // Violet 500
+            "PC Web": "#3B82F6", // Blue 500
+            "Mobile Web": "#6366F1", // Indigo 500
+            "Mobile App": "#0EA5E9", // Sky 500
+            Tablet: "#F59E0B", // Amber 500
             Default: "#9CA3AF", // Gray 400
         };
 
@@ -51,14 +53,14 @@ export const useProjectCharts = () => {
         // Outer Data (Figma Status)
         const outerData = [
             {
-                name: "연동",
+                name: "피그마 - 연동",
                 y: totalConnected,
-                color: "#059669", // Emerald Dark
+                color: "#10B981", // Emerald 500 (Matches 'Active/Success')
             },
             {
-                name: "미연동",
+                name: "피그마 - 미연동",
                 y: totalNotConnected,
-                color: "#E5E7EB", // Gray Light
+                color: "#94A3B8", // Slate 400 (Matches 'Inactive')
             },
         ].filter((d) => d.y > 0);
 
@@ -182,16 +184,76 @@ export const useProjectCharts = () => {
                 {
                     name: "Artifacts",
                     data: data,
-                    color: "#8B5CF6", // Violet
+                    color: "#3B82F6", // Blue 500 (Matches 'Generated')
                 },
             ],
             credits: {enabled: false},
         };
+
+        // 3. 주요 기능 워드 클라우드 (Word Cloud)
+        if (stats.project_features && stats.project_features.length > 0) {
+            const featureCounts = stats.project_features.reduce(
+                (acc: Record<string, number>, curr: string) => {
+                    acc[curr] = (acc[curr] || 0) + 1;
+                    return acc;
+                },
+                {} as Record<string, number>
+            );
+
+            const featureData = Object.entries(featureCounts)
+                .map(([name, weight]) => ({
+                    name,
+                    weight,
+                }))
+                .sort((a: any, b: any) => b.weight - a.weight); // 빈도수 내림차순 정렬
+
+            projectFeatureOptions.value = {
+                chart: {
+                    type: "wordcloud",
+                    backgroundColor: "transparent",
+                    style: {fontFamily: "Inter, sans-serif"},
+                },
+                title: {
+                    text: "프로젝트 주요 기능 키워드",
+                    align: "left",
+                    style: {fontSize: "16px", fontWeight: "600"},
+                },
+                series: [
+                    {
+                        type: "wordcloud",
+                        data: featureData,
+                        name: "Occurrences",
+                        colors: [
+                            "#3B82F6", // Blue 500
+                            "#10B981", // Emerald 500
+                            "#6366F1", // Indigo 500
+                            "#F59E0B", // Amber 500
+                            "#0EA5E9", // Sky 500
+                            "#8B5CF6", // Violet 500
+                        ],
+                        minFontSize: 12,
+                        maxFontSize: 24, // 너무 크지 않게 조절
+                        rotation: {
+                            from: 0,
+                            to: 0, // 가로 정렬만 허용 (가독성 위해)
+                            orientations: 1,
+                        },
+                    },
+                ],
+                tooltip: {
+                    headerFormat:
+                        '<span style="font-size: 10px">{point.key}</span><br/>',
+                    pointFormat: "<b>{point.weight}</b> projects",
+                },
+                credits: {enabled: false},
+            };
+        }
     };
 
     return {
         projectCompositionOptions,
         projectArtifactOptions,
+        projectFeatureOptions,
         updateProjectCharts,
     };
 };

@@ -79,6 +79,7 @@ const handleLogin = async () => {
                     <label class="block text-sm font-medium text-gray-700"
                         >이메일 주소</label
                     >
+                    <!-- TODO: 테스트용 value -->
                     <input
                         v-model="email"
                         class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all text-gray-900 placeholder:text-gray-400 text-sm"
@@ -86,6 +87,8 @@ const handleLogin = async () => {
                         required
                         type="email"
                     />
+                    chu5491@gmail.com<br />
+                    admin@admin.com
                 </div>
                 <div class="space-y-1.5">
                     <div class="flex justify-between items-center">
@@ -98,6 +101,7 @@ const handleLogin = async () => {
                             >비밀번호를 잊으셨나요?</a
                         >
                     </div>
+                    <!-- TODO: 테스트용 value -->
                     <input
                         v-model="password"
                         class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all text-gray-900 placeholder:text-gray-400 text-sm"
@@ -105,6 +109,8 @@ const handleLogin = async () => {
                         required
                         type="password"
                     />
+                    a0215487<br />
+                    admin
                 </div>
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">

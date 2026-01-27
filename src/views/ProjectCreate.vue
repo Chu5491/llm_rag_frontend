@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import {ref, computed, onUnmounted} from "vue";
+import {ref, computed, onUnmounted, onMounted} from "vue";
 import {useRouter} from "vue-router";
 import {checkFigmaPersist, createProject} from "../services/api.js";
 import {useAlert} from "../composables/useAlert.js";
+import {useAuthStore} from "../stores/auth.js";
 
 import {
     ArtifactItem,
@@ -18,6 +19,7 @@ import {getFileIcon, getFileIconColor} from "../utils/fileIcons.js";
 
 const router = useRouter();
 const {showAlert} = useAlert();
+const authStore = useAuthStore();
 
 // 저장 상태 (idle, saving, done)
 const saveStatus = ref<"idle" | "saving" | "done">("idle");
@@ -171,6 +173,12 @@ const handleCancel = () => {
 };
 
 const handleSubmit = async () => {
+    // 0. 인증 체크 (세션 만료 등 대비)
+    if (!authStore.isAuthenticated) {
+        showAlert("로그인 세션이 만료되었습니다. 다시 로그인해주세요.", "오류");
+        return;
+    }
+
     if (saveStatus.value !== "idle") return;
 
     // 1. 저장 중 상태 전환
@@ -182,6 +190,7 @@ const handleSubmit = async () => {
             name: projectBase.value.name,
             description: projectBase.value.description,
             service_type: projectBase.value.service_type,
+            user_id: authStore.user?.id,
             artifacts: artifacts.value.map((a) => ({
                 source_type: a.source_type,
                 name: a.name,
@@ -228,6 +237,8 @@ const formatFileSize = (bytes: number) => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
+
+// 권한 체크 (onMounted 제거 - 제출 시 확인)
 </script>
 
 <template>

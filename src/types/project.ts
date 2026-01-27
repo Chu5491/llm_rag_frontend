@@ -106,6 +106,7 @@ export interface FeatureCreate {
 export interface ProjectCreate extends ProjectBase {
     artifacts: ArtifactCreate[];
     external_systems: ExternalSystemCreate[];
+    user_id?: number;
 }
 
 // --- 3. API Response ---

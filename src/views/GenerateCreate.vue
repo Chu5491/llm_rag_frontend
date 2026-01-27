@@ -12,6 +12,7 @@ import {
 import router from "../router/index.js";
 import BaseModal from "../components/BaseModal.vue";
 import {useAlert} from "../composables/useAlert.js";
+import {useAuthStore} from "../stores/auth.js"; // Added
 // 날짜 포맷 헬퍼
 const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
@@ -178,6 +179,7 @@ const getArtifactCount = (type: string) => {
 
 // --- Setup ---
 const {showAlert} = useAlert();
+const authStore = useAuthStore(); // Added
 // 초기 데이터 로드 (Projects + Ollama Models)
 onMounted(async () => {
     // 1. 프로젝트 목록 로드
@@ -221,6 +223,12 @@ const handleCancel = () => {
 const isGenerating = ref(false);
 const generationStatus = ref<"idle" | "generating" | "done">("idle");
 const handleGenerate = async () => {
+    // 0. 인증 체크
+    if (!authStore.isAuthenticated) {
+        showAlert("로그인 세션이 만료되었습니다. 다시 로그인해주세요.", "오류");
+        return;
+    }
+
     if (isGenerating.value) return;
     if (!selectedProjectId.value) {
         showAlert("프로젝트를 선택해주세요.", "알림");
@@ -240,6 +248,7 @@ const handleGenerate = async () => {
             artifact_ids: selectedArtifactIds.value,
             feature_ids: selectedFeatureIds.value,
             external_system_ids: selectedExternalSystemIds.value,
+            user_id: authStore.user?.id, // Added
         };
 
         const response = await startGeneration(payload);

@@ -874,6 +874,11 @@ onMounted(() => {
                                                     v-if="
                                                         isMine(comment.user_id)
                                                     "
+                                                    @click="
+                                                        handleDeleteComment(
+                                                            comment.id
+                                                        )
+                                                    "
                                                     class="text-gray-300 hover:text-red-500 transition-colors ml-2"
                                                     title="삭제"
                                                 >

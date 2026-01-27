@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient.js";
+import {apiClient} from "./apiClient.js";
 import type {
     GenerationItem,
     HistoryDetailResponse,
@@ -13,7 +13,7 @@ export async function generateTestCases(
 ) {
     // endpoint에서 BASE_URL(/api/v1) 부분 제거
     const path = endpoint.replace("/api/v1", "");
-    return apiClient.post(path, { model });
+    return apiClient.post(path, {model});
 }
 
 // Figma 연동 정보 및 상태 확인
@@ -21,18 +21,22 @@ export async function checkFigmaPersist(
     url?: string,
     pat?: string
 ): Promise<any> {
-    return apiClient.post("/figma/info", { url, pat });
+    return apiClient.post("/figma/info", {url, pat});
 }
 
 // 히스토리 목록 조회
 export async function fetchHistories(
-    projectId?: number
+    projectId?: number,
+    userId?: number
 ): Promise<GenerationItem[]> {
     const params: Record<string, any> = {};
     if (projectId) {
         params.project_id = projectId;
     }
-    return apiClient.get<GenerationItem[]>("/history", { params });
+    if (userId) {
+        params.user_id = userId;
+    }
+    return apiClient.get<GenerationItem[]>("/history", {params});
 }
 
 // 히스토리 상세 조회
@@ -40,7 +44,7 @@ export async function fetchHistoryDetail(
     id: number
 ): Promise<HistoryDetailResponse> {
     return apiClient.get<HistoryDetailResponse>(`/history/${id}`, {
-        params: { polling: true },
+        params: {polling: true},
     });
 }
 

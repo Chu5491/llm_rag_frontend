@@ -11,6 +11,7 @@ import {
 } from "../services/historyApi.js";
 import {fetchProjects} from "../services/projectApi.js";
 import {useAlert} from "../composables/useAlert.js";
+import {useAuthStore} from "../stores/auth.js"; // Added
 
 import type {
     GenerationItem,
@@ -39,6 +40,7 @@ const itemsPerPage = ref(10); // 테이블 페이지네이션
 const route = useRoute();
 const router = useRouter();
 const {showAlert, showConfirm} = useAlert();
+const authStore = useAuthStore();
 
 // URL Query에서 초기값 로드
 const getQueryParam = (key: string) => {
@@ -699,6 +701,18 @@ const handleRetry = async (id: number) => {
                                         >
                                             {{ item.title }}
                                         </h3>
+                                        <!-- My Task Badge -->
+                                        <span
+                                            v-if="
+                                                item.user_id &&
+                                                authStore.user &&
+                                                item.user_id ===
+                                                    authStore.user.id
+                                            "
+                                            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200"
+                                        >
+                                            ME
+                                        </span>
                                         <span
                                             class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide border"
                                             :class="

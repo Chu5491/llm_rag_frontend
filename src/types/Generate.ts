@@ -5,6 +5,7 @@ export type GenerationStatus = "running" | "success" | "failed" | "cancelled";
 export interface GenerationItem {
     id: number;
     project_id: number;
+    user_id?: number | null; // Added
     title: string;
     source_type: string;
     status: GenerationStatus;
@@ -28,6 +29,7 @@ export interface HistoryDetailResponse extends GenerationItem {
 export interface StartGenerationRequest {
     title: string;
     project_id: number;
+    user_id?: number; // Added
     model: string;
     language: string;
     tcPrefix: string;

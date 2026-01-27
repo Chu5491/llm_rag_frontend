@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import {computed} from "vue";
+import {computed, ref} from "vue";
 import {useRoute, useRouter} from "vue-router";
 import {useAuthStore} from "../stores/auth.js";
+import NotificationBell from "./NotificationBell.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -37,29 +38,19 @@ const pageTitle = computed(() => {
 </script>
 <template>
     <header
-        class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-6 h-16 flex items-center justify-between"
+        class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 h-14 flex items-center justify-between"
     >
         <!-- Left: Page Title / Breadcrumbs -->
         <div class="flex items-center">
-            <h2 class="text-xl font-semibold text-gray-800 tracking-tight">
+            <h2 class="text-lg font-semibold text-gray-800 tracking-tight">
                 {{ pageTitle }}
             </h2>
         </div>
 
         <!-- Right: Actions -->
         <div class="flex items-center gap-4">
-            <!-- Notification Button -->
-            <button
-                class="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors relative"
-            >
-                <span class="sr-only">View notifications</span>
-                <span class="material-symbols-outlined text-xl"
-                    >notifications_none</span
-                >
-                <span
-                    class="absolute top-2 right-2 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
-                ></span>
-            </button>
+            <!-- Notification Component -->
+            <NotificationBell />
 
             <!-- Profile Dropdown -->
             <div

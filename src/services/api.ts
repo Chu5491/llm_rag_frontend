@@ -8,3 +8,4 @@ export * from "./historyApi.js";
 export * from "./testcaseApi.js";
 export * from "./userApi.js";
 export * from "./dashboardApi.js";
+export * from "./notificationApi.js";

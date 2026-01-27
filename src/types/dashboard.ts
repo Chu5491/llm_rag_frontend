@@ -30,6 +30,7 @@ export interface DashboardStats {
     target_history_count: number;
     target_testcase_count: number;
     project_id: number | null;
+    project_features?: string[]; // 프로젝트 주요 기능 키워드
     // 차트용 데이터 (Optional - 초기 로딩 시 없을 수 있음)
     tc_usability_trend?: TrendItem[];
     tc_generation_trend?: TrendItem[];

@@ -1,15 +1,27 @@
 <script setup lang="ts">
 import {ref, onMounted, watch, computed} from "vue";
 import {Chart as Highcharts} from "highcharts-vue";
+import HC from "highcharts";
+import wordcloud from "highcharts/modules/wordcloud.js";
+
+if (typeof wordcloud === "function") {
+    (wordcloud as any)(HC);
+} else if (wordcloud && typeof (wordcloud as any).default === "function") {
+    (wordcloud as any).default(HC);
+}
+
 import {dashboardApi} from "../services/dashboardApi.js";
 import {fetchProjects} from "../services/projectApi.js";
 import type {DashboardStats} from "../types/dashboard.js";
 import type {ProjectResponse} from "../types/project.js";
 
+import LoadingSpinner from "../components/LoadingSpinner.vue";
+
 // Composables
 import {useProjectCharts} from "../composables/dashboard/useProjectCharts.js";
 import {useModelCharts} from "../composables/dashboard/useModelCharts.js";
 import {useTrendCharts} from "../composables/dashboard/useTrendCharts.js";
+import {useAlert} from "../composables/useAlert.js";
 
 // --- State ---
 const stats = ref<DashboardStats>({
@@ -40,8 +52,12 @@ const hasTcData = computed(() => {
 });
 
 // --- Composables 연결 ---
-const {projectCompositionOptions, projectArtifactOptions, updateProjectCharts} =
-    useProjectCharts();
+const {
+    projectCompositionOptions,
+    projectArtifactOptions,
+    projectFeatureOptions,
+    updateProjectCharts,
+} = useProjectCharts();
 
 const {modelStatsOptions, updateModelCharts} = useModelCharts();
 
@@ -52,6 +68,8 @@ const {
     updateTrendCharts,
 } = useTrendCharts();
 
+const {showAlert} = useAlert();
+
 // --- Actions ---
 const loadProjects = async () => {
     try {
@@ -59,6 +77,7 @@ const loadProjects = async () => {
         projects.value = data;
     } catch (error) {
         console.error("프로젝트 목록 조회 실패:", error);
+        showAlert("프로젝트 목록을 불러오는데 실패했습니다.");
     }
 };
 
@@ -78,6 +97,7 @@ const loadStats = async () => {
         updateTrendCharts(data);
     } catch (error) {
         console.error("통계 조회 실패:", error);
+        showAlert("대시보드 통계를 불러오는데 실패했습니다.");
     } finally {
         isLoading.value = false;
     }
@@ -229,9 +249,9 @@ onMounted(() => {
                 @click="activeTab = tab.id"
                 :class="[
                     activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                        : 'border-transparent text-gray-700 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-500 hover:border-gray-300',
+                    'whitespace-nowrap py-4 px-3 border-b-2 font-medium text-sm transition-colors min-h-11',
                 ]"
             >
                 {{ tab.label }}
@@ -240,9 +260,11 @@ onMounted(() => {
 
         <!-- 1. Projects Tab -->
         <div v-if="activeTab === 'projects'" class="space-y-6">
-            <section
-                v-if="!isLoading && (stats.projects_stats || []).length > 0"
-            >
+            <!-- Loading Spinner -->
+            <div v-if="isLoading" class="flex justify-center items-center h-80">
+                <LoadingSpinner message="프로젝트 데이터를 분석 중입니다..." />
+            </div>
+            <section v-else-if="(stats.projects_stats || []).length > 0">
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <!-- Project Composition (Double Pie) -->
                     <div
@@ -264,6 +286,16 @@ onMounted(() => {
                             :key="selectedProjectId"
                         ></highcharts>
                     </div>
+                    <!-- Keyword Word Cloud -->
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-4"
+                    >
+                        <highcharts
+                            :options="projectFeatureOptions"
+                            class="w-full h-80"
+                            :key="selectedProjectId"
+                        ></highcharts>
+                    </div>
                 </div>
             </section>
             <section
@@ -276,8 +308,14 @@ onMounted(() => {
 
         <!-- 2. Test Cases Tab -->
         <div v-if="activeTab === 'testcases'" class="space-y-6">
+            <!-- Loading Spinner -->
+            <div v-if="isLoading" class="flex justify-center items-center h-80">
+                <LoadingSpinner
+                    message="테스트케이스 통계를 불러오는 중입니다..."
+                />
+            </div>
             <section
-                v-if="!isLoading && hasTcData"
+                v-else-if="hasTcData"
                 class="grid grid-cols-1 lg:grid-cols-2 gap-6"
             >
                 <!-- Generation Trend -->
@@ -323,9 +361,14 @@ onMounted(() => {
 
         <!-- 3. Models Tab -->
         <div v-if="activeTab === 'models'" class="space-y-6">
-            <section
-                v-if="!isLoading && (stats.tc_model_stats || []).length > 0"
+            <!-- Loading Spinner -->
+            <div
+                v-if="isLoading"
+                class="flex justify-center items-center h-[480px]"
             >
+                <LoadingSpinner message="AI 모델 성과를 분석 중입니다..." />
+            </div>
+            <section v-else-if="(stats.tc_model_stats || []).length > 0">
                 <div
                     class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
                 >
@@ -341,7 +384,7 @@ onMounted(() => {
                 v-else
                 class="p-10 text-center text-gray-500 bg-white rounded-xl border border-gray-200"
             >
-                모델 데이터가 없습니다.
+                Model Data Empty
             </section>
         </div>
 
@@ -352,20 +395,20 @@ onMounted(() => {
                 stats.total_project_count === 0 &&
                 selectedProjectId === 'all'
             "
-            class="mt-8 p-12 bg-white rounded-2xl border border-dashed border-gray-300 text-center"
+            class="mt-8 p-12 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 text-center"
         >
-            <!-- ... (Empty State Content 유지) ... -->
+            <!-- ... (Empty State Content) ... -->
             <div
-                class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4"
+                class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4"
             >
                 <span class="material-icons-outlined text-3xl text-gray-400"
                     >folder_off</span
                 >
             </div>
-            <h3 class="text-lg font-medium text-gray-900">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                 등록된 프로젝트가 없습니다
             </h3>
-            <p class="mt-1 text-gray-500">
+            <p class="mt-1 text-gray-500 dark:text-gray-400">
                 새로운 프로젝트를 생성하여 테스트케이스 관리를 시작해보세요.
             </p>
         </section>
